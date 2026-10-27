@@ -1,0 +1,106 @@
+// 青简 · 本地历史与缓存。方法统一 store_ 前缀。
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import org.json.JSONObject;
+
+public File store_dir() {
+    File d = new File(activity.getFilesDir(), "qingjian");
+    if (!d.exists()) d.mkdirs();
+    return d;
+}
+
+public ArrayList store_lines(File f) {
+    ArrayList out = new ArrayList();
+    if (!f.exists()) return out;
+    try {
+        BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+        String line = r.readLine();
+        while (line != null) {
+            if (line.trim().length() > 0) out.add(line);
+            line = r.readLine();
+        }
+        r.close();
+    } catch (Throwable t) {
+        i.syso("STORE read fail " + t);
+    }
+    return out;
+}
+
+public void store_write(File f, ArrayList lines) {
+    try {
+        StringBuilder sb = new StringBuilder();
+        for (int k = 0; k < lines.size(); k++) {
+            sb.append((String) lines.get(k));
+            if (k < lines.size() - 1) sb.append("\n");
+        }
+        FileOutputStream fos = new FileOutputStream(f);
+        OutputStreamWriter w = new OutputStreamWriter(fos, "UTF-8");
+        w.write(sb.toString());
+        w.close();
+        fos.close();
+    } catch (Throwable t) {
+        i.syso("STORE write fail " + t);
+    }
+}
+
+public void store_saveHistory(String itemJson, int page, int total) {
+    try {
+        JSONObject item = new JSONObject(itemJson);
+        item.put("page", page);
+        item.put("total", total);
+        item.put("updatedAt", System.currentTimeMillis() / 1000);
+        String key = item.optString("key");
+
+        ArrayList old = store_lines(new File(store_dir(), "history.jsonl"));
+        ArrayList out = new ArrayList();
+        out.add(item.toString());
+        for (int k = 0; k < old.size(); k++) {
+            String ln = (String) old.get(k);
+            try {
+                JSONObject o = new JSONObject(ln);
+                if (key.equals(o.optString("key"))) continue;
+            } catch (Throwable t2) {
+            }
+            out.add(ln);
+        }
+        while (out.size() > 50) out.remove(out.size() - 1);
+        store_write(new File(store_dir(), "history.jsonl"), out);
+    } catch (Throwable t) {
+        i.syso("STORE save fail " + t);
+    }
+}
+
+public ArrayList store_history() {
+    return store_lines(new File(store_dir(), "history.jsonl"));
+}
+
+public void store_clearHistory() {
+    File f = new File(store_dir(), "history.jsonl");
+    if (f.exists()) f.delete();
+}
+
+public void store_cache(String key, String json) {
+    try {
+        File d = new File(store_dir(), "cache");
+        if (!d.exists()) d.mkdirs();
+        ArrayList one = new ArrayList();
+        one.add(json);
+        store_write(new File(d, key + ".json"), one);
+    } catch (Throwable t) {
+        i.syso("STORE cache fail " + t);
+    }
+}
+
+public String store_cacheGet(String key) {
+    File f = new File(new File(store_dir(), "cache"), key + ".json");
+    if (!f.exists()) return null;
+    ArrayList one = store_lines(f);
+    if (one.size() == 0) return null;
+    return (String) one.get(0);
+}

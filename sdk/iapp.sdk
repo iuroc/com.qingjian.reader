@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iapp v="2">
+<sdklist>
+<sdk aar="true" time="1784013985414" maven="" more="">androidx.appcompat:appcompat:1.7.1</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">com.google.android.material:material:1.13.0</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">androidx.constraintlayout:constraintlayout:2.2.1</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">androidx.webkit:webkit:1.14.0</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">androidx.swiperefreshlayout:swiperefreshlayout:1.1.0</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">androidx.documentfile:documentfile:1.1.0</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">androidx.core:core:1.17.0</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">pl.droidsonroids.gif:android-gif-drawable:1.2.31</sdk>
+<sdk aar="true" time="1784013985414" maven="" more="">com.github.castorflex.verticalviewpager:library:19.0.1</sdk>
+</sdklist>
+</iapp>

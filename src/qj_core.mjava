@@ -1,0 +1,184 @@
+// 青简 · 数据层。方法统一 core_ 前缀。全部同步阻塞，调用方自己放后台线程。
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.json.JSONObject;
+import org.json.JSONArray;
+
+public String core_get(String url) {
+    try {
+        return i.hs(url);
+    } catch (Throwable t) {
+        i.syso("CORE get fail " + t);
+        return null;
+    }
+}
+
+public String core_fixSurl(String surl) {
+    if (surl == null) return "";
+    if (surl.startsWith("http")) return surl;
+    return "https://" + surl;
+}
+
+// ---------- 列表 ----------
+
+public ArrayList core_books(int cataid, int page, int size) {
+    String u = "http://gede.5read.com/apis/touchBook/books.jspx?cataid=" + cataid
+        + "&page=" + page + "&pageSize=" + size + "&gedeid=84751638";
+    return core_parseBooks(core_get(u));
+}
+
+public ArrayList core_search(String kw, int page, int size) {
+    String q = "";
+    try { q = URLEncoder.encode(kw, "UTF-8"); } catch (Throwable t) { q = kw; }
+    String u = "http://gede.5read.com/apis/touchBook/books.jspx?keyword=" + q
+        + "&page=" + page + "&pageSize=" + size + "&gedeid=84751638";
+    return core_parseBooks(core_get(u));
+}
+
+public ArrayList core_parseBooks(String body) {
+    ArrayList out = new ArrayList();
+    if (body == null) return out;
+    try {
+        JSONObject jo = new JSONObject(body);
+        if (jo.optInt("result") != 1) {
+            i.syso("CORE books result=" + jo.optInt("result") + " " + jo.optString("errorMsg"));
+            return out;
+        }
+        JSONArray arr = jo.getJSONObject("msg").getJSONArray("list");
+        for (int k = 0; k < arr.length(); k++) {
+            JSONObject o = arr.getJSONObject(k);
+            HashMap m = new HashMap();
+            String num = o.optString("bookNum");
+            m.put("key", num);
+            m.put("type", "ebook");
+            m.put("title", o.optString("title"));
+            m.put("author", o.optString("author"));
+            m.put("summary", o.optString("summary"));
+            m.put("cover", o.optString("cover"));
+            m.put("surl", o.optString("surl"));
+            m.put("bookNum", num);
+            m.put("newbook", "" + o.optInt("newbook"));
+            out.add(m);
+        }
+    } catch (Throwable t) {
+        i.syso("CORE parseBooks fail " + t);
+    }
+    return out;
+}
+
+public ArrayList core_magazines(int cataid, int page, int size) {
+    String u = "http://gede.5read.com/apis/magazine/magazines.jspx?cataid=" + cataid
+        + "&page=" + page + "&pageSize=" + size + "&gedeid=84751638";
+    ArrayList out = new ArrayList();
+    String body = core_get(u);
+    if (body == null) return out;
+    try {
+        JSONObject jo = new JSONObject(body);
+        if (jo.optInt("result") != 1) {
+            i.syso("CORE mags result=" + jo.optInt("result") + " " + jo.optString("errorMsg"));
+            return out;
+        }
+        JSONArray arr = jo.getJSONObject("msg").getJSONArray("list");
+        for (int k = 0; k < arr.length(); k++) {
+            JSONObject o = arr.getJSONObject(k);
+            HashMap m = new HashMap();
+            int id = o.optInt("id");
+            m.put("key", "m" + id);
+            m.put("type", "magazine");
+            m.put("title", o.optString("name"));
+            m.put("author", o.optString("ISSN"));
+            m.put("summary", o.optString("summary"));
+            m.put("cover", o.optString("coverPath"));
+            m.put("surl", o.optString("surl"));
+            m.put("magazineId", "" + id);
+            out.add(m);
+        }
+    } catch (Throwable t) {
+        i.syso("CORE parseMags fail " + t);
+    }
+    return out;
+}
+
+public ArrayList core_issues(int magazineId) {
+    String u = "http://gede.5read.com/apis/magazine/magazineItems.jspx?magazineid=" + magazineId;
+    ArrayList out = new ArrayList();
+    String body = core_get(u);
+    if (body == null) return out;
+    try {
+        JSONObject jo = new JSONObject(body);
+        if (jo.optInt("result") != 1) {
+            i.syso("CORE issues result=" + jo.optInt("result"));
+            return out;
+        }
+        JSONArray arr = jo.getJSONObject("msg").getJSONArray("itemList");
+        for (int k = 0; k < arr.length(); k++) {
+            JSONObject o = arr.getJSONObject(k);
+            HashMap m = new HashMap();
+            String num = o.optString("magazineItemNum");
+            m.put("key", num);
+            m.put("type", "issue");
+            m.put("title", o.optString("name"));
+            m.put("issueLabel", o.optString("issue"));
+            m.put("cover", o.optString("coverPath"));
+            m.put("surl", o.optString("surl"));
+            m.put("magazineId", "" + magazineId);
+            m.put("issueNum", num);
+            out.add(m);
+        }
+    } catch (Throwable t) {
+        i.syso("CORE parseIssues fail " + t);
+    }
+    return out;
+}
+
+// ---------- 阅读 ----------
+
+public String core_match(String body, String regex) {
+    try {
+        Matcher m = Pattern.compile(regex).matcher(body);
+        if (m.find()) return m.group(1);
+    } catch (Throwable t) {
+        i.syso("CORE match fail " + t);
+    }
+    return null;
+}
+
+public HashMap core_read(String surl, int fsize) {
+    HashMap out = new HashMap();
+    try {
+        String fixed = core_fixSurl(surl);
+        String page = core_get("https://gede.5read.com/o/a.h?a=GEDE:" + URLEncoder.encode(fixed, "UTF-8"));
+        if (page == null) { i.syso("CORE read bootstrap null"); return out; }
+
+        String du = core_match(page, "detailUrl:\\s*'([^']+)'");
+        String sid = core_match(page, "sid:\\s*'([^']*)'");
+        String from = core_match(page, "from:\\s*'([^']*)'");
+        if (du == null || sid == null || from == null) {
+            i.syso("CORE read token fail du=" + (du != null) + " sid=" + (sid != null) + " from=" + (from != null));
+            return out;
+        }
+
+        String u = "https://gede.5read.com/other/epub_epubRead_readNew.jspx?psize=10000&ucatalog=true&ctype=3"
+            + "&fsize=" + fsize + "&sid=" + URLEncoder.encode(sid, "UTF-8")
+            + "&from=" + from + "&detailUrl=" + URLEncoder.encode(du, "UTF-8");
+        String body = core_get(u);
+        if (body == null) { i.syso("CORE read body null"); return out; }
+
+        JSONObject jo = new JSONObject(body);
+        if (jo.optInt("result") != 1) {
+            i.syso("CORE read result=" + jo.optInt("result") + " " + jo.optString("errorMsg"));
+            return out;
+        }
+        JSONObject msg = jo.getJSONObject("msg");
+        out.put("contents", msg.getJSONArray("contents"));
+        out.put("catalogs", msg.getJSONArray("catalogs"));
+        out.put("pageAll", "" + msg.optInt("pageAll"));
+    } catch (Throwable t) {
+        i.syso("CORE read fail " + t);
+    }
+    return out;
+}

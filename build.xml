@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iapp>
+<classExtends></classExtends>
+<pathRemarks></pathRemarks>
+<importClass></importClass>
+<newControl>
+<itme title="MaterialToolbar" class="com.google.android.material.appbar.MaterialToolbar" info="M3 顶部栏"/>
+<itme title="MaterialButton" class="com.google.android.material.button.MaterialButton" info="M3 按钮"/>
+<itme title="MaterialCardView" class="com.google.android.material.card.MaterialCardView" info="M3 卡片"/>
+<itme title="TabLayout" class="com.google.android.material.tabs.TabLayout" info="M3 标签页"/>
+<itme title="TextInputLayout" class="com.google.android.material.textfield.TextInputLayout" info="M3 输入框容器"/>
+<itme title="TextInputEditText" class="com.google.android.material.textfield.TextInputEditText" info="M3 输入框"/>
+<itme title="CircularProgressIndicator" class="com.google.android.material.progressindicator.CircularProgressIndicator" info="加载指示"/>
+<itme title="LinearProgressIndicator" class="com.google.android.material.progressindicator.LinearProgressIndicator" info="线性进度"/>
+<itme title="MaterialSwitch" class="com.google.android.material.materialswitch.MaterialSwitch" info="M3 开关"/>
+</newControl>
+<codeEvent></codeEvent>
+<dexClass></dexClass>
+<codeComment></codeComment>
+</iapp>

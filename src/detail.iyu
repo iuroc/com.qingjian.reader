@@ -1,0 +1,139 @@
+<View id="1" did="0" type="FrameLayout">
+<ppt>width=-1
+height=-1
+backgroundcolor=#FBF8F1</ppt>
+<event></event>
+</View>
+<View id="2" did="1" type="LinearLayout">
+<ppt>width=-1
+height=-1
+orientation=vertical</ppt>
+<event></event>
+</View>
+<View id="3" did="2" type="ScrollView">
+<ppt>width=-1
+height=0
+layout_weight=1
+scrollbars=none
+overScrollMode=never</ppt>
+<event></event>
+</View>
+<View id="4" did="3" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=vertical</ppt>
+<event></event>
+</View>
+<View id="5" did="4" type="ImageView">
+<ppt>width=44dp
+height=44dp
+layout_marginleft=16dp
+layout_margintop=12dp</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.back", 4)</eventItme></event>
+</View>
+<View id="6" did="4" type="ImageView">
+<ppt>width=120dp
+height=160dp
+scaleType=fitxy
+layout_marginleft=24dp
+layout_margintop=8dp
+backgroundcolor=#F5F2EA</ppt>
+<event></event>
+</View>
+<View id="7" did="4" type="TextView">
+<ppt>width=-1
+height=-2
+text=
+textsize=32sp
+textstyle=bold
+textcolor=#1B1C18
+layout_marginleft=24dp
+layout_marginright=24dp
+layout_margintop=16dp</ppt>
+<event></event>
+</View>
+<View id="8" did="4" type="TextView">
+<ppt>width=-1
+height=-2
+text=
+textsize=16sp
+textcolor=#414944
+layout_marginleft=24dp
+layout_marginright=24dp
+layout_margintop=6dp</ppt>
+<event></event>
+</View>
+<View id="9" did="4" type="TextView">
+<ppt>width=-1
+height=-2
+text=
+textsize=16sp
+textcolor=#1B1C18
+lineSpacingMultiplier=1.5
+layout_marginleft=24dp
+layout_marginright=24dp
+layout_margintop=16dp
+layout_marginbottom=32dp</ppt>
+<event></event>
+</View>
+<View id="10" did="2" type="LinearLayout">
+<ppt>width=-1
+height=88dp
+orientation=horizontal
+gravity=center_vertical
+backgroundcolor=#F5F2EA</ppt>
+<event></event>
+</View>
+<View id="11" did="10" type="com.google.android.material.button.MaterialButton">
+<ppt>width=-1
+height=52dp
+text=开始阅读
+textsize=15sp
+layout_marginleft=16dp
+layout_marginright=16dp</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.action", 0)</eventItme></event>
+</View>
+<View id="20" did="1" type="FrameLayout">
+<ppt>width=-1
+height=-1
+backgroundcolor=#66000000
+visibility=gone</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.closePick", 0)</eventItme></event>
+</View>
+<View id="21" did="20" type="LinearLayout">
+<ppt>width=-1
+height=420dp
+orientation=vertical
+backgroundcolor=#FBF8F1
+layout_gravity=bottom</ppt>
+<event></event>
+</View>
+<View id="22" did="21" type="TextView">
+<ppt>width=-1
+height=-2
+text=选择期次
+textsize=20sp
+textstyle=bold
+textcolor=#1B1C18
+layout_marginleft=20dp
+layout_margintop=20dp
+layout_marginbottom=8dp</ppt>
+<event></event>
+</View>
+<View id="23" did="21" type="ScrollView">
+<ppt>width=-1
+height=0
+layout_weight=1
+scrollbars=none
+overScrollMode=never</ppt>
+<event></event>
+</View>
+<View id="24" did="23" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=vertical</ppt>
+<event></event>
+</View>
+<UIEventset><eventItme type="loading">
+call(null, "mjava", "qj_pages.detail")
+</eventItme><eventItme type="downkey">call(null, "mjava", "qj_pages.backKey", "D", st_kC)</eventItme></UIEventset>

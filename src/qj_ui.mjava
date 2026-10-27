@@ -1,0 +1,121 @@
+// 青简 · 主题与通用 UI。方法统一 ui_ 前缀，供 iyu 直接 call、供其它模块 i.fn 后调用。
+
+import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import com.google.android.material.appbar.MaterialToolbar;
+
+public int ui_dp(int v) {
+    return (int) (v * activity.getResources().getDisplayMetrics().density + 0.5f);
+}
+
+public boolean ui_dark() {
+    int m = activity.getResources().getConfiguration().uiMode & 0x30;
+    return m == 0x20;
+}
+
+public ColorStateList ui_cs(String hex) {
+    return ColorStateList.valueOf(Color.parseColor(hex));
+}
+
+public int ui_c(String token) {
+    boolean d = ui_dark();
+    if ("surface".equals(token)) return Color.parseColor(d ? "#121511" : "#FBF8F1");
+    if ("surfaceContainer".equals(token)) return Color.parseColor(d ? "#1E211D" : "#F5F2EA");
+    if ("onSurface".equals(token)) return Color.parseColor(d ? "#E3E3DA" : "#1B1C18");
+    if ("onSurfaceVariant".equals(token)) return Color.parseColor(d ? "#C0C9C1" : "#414944");
+    if ("primary".equals(token)) return Color.parseColor(d ? "#A9CDC1" : "#3F6459");
+    if ("onPrimary".equals(token)) return Color.parseColor(d ? "#12332C" : "#FFFFFF");
+    if ("primaryContainer".equals(token)) return Color.parseColor(d ? "#2A4A42" : "#C3E9DC");
+    if ("onPrimaryContainer".equals(token)) return Color.parseColor(d ? "#C3E9DC" : "#00201A");
+    if ("tertiary".equals(token)) return Color.parseColor(d ? "#E4C28C" : "#79582B");
+    if ("outline".equals(token)) return Color.parseColor(d ? "#8A938C" : "#717973");
+    if ("divider".equals(token)) return Color.parseColor(d ? "#333630" : "#E9E5DC");
+    return Color.parseColor("#FF00FF");
+}
+
+public void screen(int rootId) {
+    View root = activity.findViewById(rootId);
+    if (root != null) root.setBackgroundColor(ui_c("surface"));
+
+    MaterialToolbar tb = (MaterialToolbar) activity.findViewById(2);
+    if (tb != null) {
+        tb.setTitle("青简");
+        tb.setTitleTextColor(ui_c("onSurface"));
+        tb.setBackgroundColor(ui_c("surface"));
+    }
+    View bar = activity.findViewById(20);
+    if (bar != null) bar.setBackgroundColor(ui_c("surfaceContainer"));
+
+    ImageView i0 = (ImageView) activity.findViewById(24);
+    if (i0 != null) i0.setImageBitmap(ui_icon("bamboo"));
+    ImageView i1 = (ImageView) activity.findViewById(25);
+    if (i1 != null) i1.setImageBitmap(ui_icon("book"));
+    ImageView i2 = (ImageView) activity.findViewById(26);
+    if (i2 != null) i2.setImageBitmap(ui_icon("clock"));
+}
+
+public Bitmap ui_icon(String name) {
+    return ui_iconSize(name, 24, (float) 2);
+}
+
+public Bitmap ui_iconSize(String name, int sizeDp, float strokeDp) {
+    int n = ui_dp(sizeDp);
+    Bitmap bmp = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888);
+    Canvas c = new Canvas(bmp);
+    Paint p = new Paint();
+    p.setAntiAlias(true);
+    p.setColor(Color.BLACK);
+    p.setStyle(Paint.Style.STROKE);
+    p.setStrokeWidth((float) (strokeDp * activity.getResources().getDisplayMetrics().density));
+    p.setStrokeCap(Paint.Cap.ROUND);
+    if ("bamboo".equals(name)) {
+        c.drawLine((float) (n * 3 / 10), (float) (n * 2 / 10), (float) (n * 3 / 10), (float) (n * 8 / 10), p);
+        c.drawLine((float) (n * 5 / 10), (float) (n * 2 / 10), (float) (n * 5 / 10), (float) (n * 8 / 10), p);
+        c.drawLine((float) (n * 7 / 10), (float) (n * 2 / 10), (float) (n * 7 / 10), (float) (n * 8 / 10), p);
+    } else if ("back".equals(name)) {
+        c.drawLine((float) (n * 62 / 100), (float) n / 2, (float) (n * 38 / 100), (float) n / 2, p);
+        c.drawLine((float) (n * 38 / 100), (float) n / 2, (float) (n * 5 / 10), (float) (n * 38 / 100), p);
+        c.drawLine((float) (n * 38 / 100), (float) n / 2, (float) (n * 5 / 10), (float) (n * 62 / 100), p);
+    } else if ("book".equals(name)) {
+        c.drawRect((float) (n * 25 / 100), (float) (n * 2 / 10), (float) (n * 75 / 100), (float) (n * 8 / 10), p);
+        c.drawLine((float) (n * 4 / 10), (float) (n * 2 / 10), (float) (n * 4 / 10), (float) (n * 8 / 10), p);
+    } else {
+        c.drawCircle((float) n / 2, (float) n / 2, (float) (n * 3 / 10), p);
+        c.drawLine((float) n / 2, (float) n / 2, (float) n / 2, (float) (n * 3 / 10), p);
+        c.drawLine((float) n / 2, (float) n / 2, (float) (n * 65 / 100), (float) (n * 6 / 10), p);
+    }
+    return bmp;
+}
+
+public void ui_nav(int active) {
+    for (int k = 0; k < 3; k++) {
+        LinearLayout item = (LinearLayout) activity.findViewById(21 + k);
+        TextView label = (TextView) activity.findViewById(27 + k);
+        ImageView icon = (ImageView) activity.findViewById(24 + k);
+        boolean on = (k == active);
+        if (label != null) {
+            label.setTextColor(on ? ui_c("primary") : ui_c("onSurfaceVariant"));
+            label.setTypeface(null, on ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
+        if (icon != null) icon.setColorFilter(on ? ui_c("primary") : ui_c("onSurfaceVariant"));
+        if (item != null) item.setBackground(null);
+    }
+}
+
+// iyu 直接调用：方法名必须是 tab，参数用 Object 接（事件里传过来是 Integer）
+public void ui_switch(Object which) {
+    int w = Integer.parseInt(String.valueOf(which));
+    int[] ids = {10, 11, 12};
+    for (int k = 0; k < 3; k++) {
+        View v = activity.findViewById(ids[k]);
+        if (v != null) v.setVisibility(k == w ? View.VISIBLE : View.GONE);
+    }
+    ui_nav(w);
+}

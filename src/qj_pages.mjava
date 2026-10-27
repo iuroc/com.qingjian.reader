@@ -1,0 +1,420 @@
+// 青简 · 页面控制器：精选 / 书刊（Tab + 分类 Chip + 分页）。方法统一 pages_ 前缀，
+// 只有 iyu 直接调用的入口保留短名：boot / tab / more。
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import android.content.DialogInterface;
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.tabs.TabLayout;
+import org.json.JSONObject;
+
+public void boot() {
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
+    screen(1);
+    tab(0);
+}
+
+public void tab(Object which) {
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
+    int w = Integer.parseInt(String.valueOf(which));
+    ui_switch(w);
+    if (w == 0) home();
+    if (w == 1) shelf();
+    if (w == 2) trail(0);
+}
+
+// ---------- 精选 ----------
+
+public void home() {
+    if ("1".equals(i.sss("qj.home.loaded"))) {
+        pages_renderHome();
+        return;
+    }
+    new Thread(new Runnable() {
+        public void run() {
+            ArrayList mags = core_magazines(6, 1, 6);
+            ArrayList b1 = core_books(124, 1, 20);
+            ArrayList b2 = core_books(125, 1, 20);
+            i.sss("qj.home.mags", mags);
+            i.sss("qj.home.books", pages_pickNew(b1, b2));
+            i.syso("QJ home mags=" + mags.size() + " books=" + ((ArrayList) i.sss("qj.home.books")).size());
+            activity.runOnUiThread(new Runnable() {
+                public void run() { pages_renderHome(); }
+            });
+        }
+    }).start();
+}
+
+public ArrayList pages_pickNew(ArrayList a, ArrayList b) {
+    ArrayList out = new ArrayList();
+    for (int k = 0; k < a.size() && out.size() < 6; k++) {
+        HashMap m = (HashMap) a.get(k);
+        if ("1".equals(m.get("newbook"))) out.add(m);
+    }
+    for (int k = 0; k < b.size() && out.size() < 6; k++) {
+        HashMap m = (HashMap) b.get(k);
+        if ("1".equals(m.get("newbook"))) out.add(m);
+    }
+    for (int k = 0; k < a.size() && out.size() < 6; k++) out.add(a.get(k));
+    return out;
+}
+
+public void pages_renderHome() {
+    list_clear(13);
+    ArrayList hist = store_history();
+    if (hist.size() > 0) {
+        HashMap h = pages_histMap((String) hist.get(0));
+        if (h != null) list_continue(13, h);
+    }
+    list_header(13, "期刊精选");
+    list_cards(13, (ArrayList) i.sss("qj.home.mags"));
+    list_header(13, "图书新书");
+    list_rows(13, (ArrayList) i.sss("qj.home.books"));
+    i.sss("qj.home.loaded", "1");
+}
+
+// ---------- 书刊 ----------
+
+public void shelf() {
+    if ("1".equals(i.sss("qj.shelf.loaded"))) return;
+    pages_tabs();
+    i.sss("qj.kind", "qikan");
+    i.sss("qj.cat", "6");
+    pages_chips();
+    pages_load(1);
+    i.sss("qj.shelf.loaded", "1");
+}
+
+public void pages_tabs() {
+    TabLayout tl = (TabLayout) activity.findViewById(141);
+    if (tl == null) return;
+    tl.removeAllTabs();
+    tl.setSelectedTabIndicatorColor(ui_c("primary"));
+    tl.setTabTextColors(ui_c("onSurfaceVariant"), ui_c("primary"));
+    tl.addTab(tl.newTab().setText("期刊"));
+    tl.addTab(tl.newTab().setText("图书"));
+    tl.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        public void onTabSelected(TabLayout.Tab t) { pages_kind(t.getPosition()); }
+        public void onTabUnselected(TabLayout.Tab t) {}
+        public void onTabReselected(TabLayout.Tab t) {}
+    });
+}
+
+public void pages_kind(int pos) {
+    String kind = (pos == 0) ? "qikan" : "ebook";
+    i.sss("qj.kind", kind);
+    i.sss("qj.cat", "" + pages_ids(kind)[0]);
+    pages_chips();
+    pages_load(1);
+}
+
+public String[] pages_names(String kind) {
+    if ("qikan".equals(kind)) {
+        return new String[]{"精品推荐", "时政军事", "文学艺术", "时尚生活", "财经管理", "文化综合", "其它"};
+    }
+    return new String[]{"诗歌散文", "小说传记", "科学技术", "国学经典", "历史文化",
+                        "社会科学", "心理成长", "艺术审美", "哲学宗教", "教育研究", "家长尊享"};
+}
+
+public int[] pages_ids(String kind) {
+    if ("qikan".equals(kind)) return new int[]{6, 3, 4, 5, 8, 9, 10};
+    return new int[]{124, 125, 126, 127, 128, 129, 130, 131, 132, 140, 141};
+}
+
+public void pages_chips() {
+    LinearLayout row = (LinearLayout) activity.findViewById(143);
+    if (row == null) return;
+    row.removeAllViews();
+    String kind = (String) i.sss("qj.kind");
+    String[] names = pages_names(kind);
+    int[] ids = pages_ids(kind);
+    int cur = Integer.parseInt(String.valueOf(i.sss("qj.cat")));
+    for (int k = 0; k < names.length; k++) {
+        Chip chip = new Chip(activity);
+        chip.setText(names[k]);
+        chip.setTextSize(13);
+        chip.setCheckable(true);
+        chip.setChecked(ids[k] == cur);
+        chip.setChipBackgroundColor(ui_cs(ids[k] == cur ? "#CFE9DF" : "#EFEBE2"));
+        chip.setTextColor(ids[k] == cur ? ui_c("onPrimaryContainer") : ui_c("onSurfaceVariant"));
+        chip.setChipStrokeWidth((float) ui_dp(1));
+        chip.setChipStrokeColor(ui_cs("#C1C9C1"));
+        chip.setTag("" + ids[k]);
+        chip.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                i.sss("qj.cat", (String) v.getTag());
+                pages_chips();
+                pages_load(1);
+            }
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.leftMargin = ui_dp(k == 0 ? 16 : 8);
+        lp.rightMargin = ui_dp(4);
+        row.addView(chip, lp);
+    }
+}
+
+public void pages_load(int pageNo) {
+    TextView st = (TextView) activity.findViewById(146);
+    if (st != null) {
+        st.setText("正在加载");
+        st.setVisibility(View.VISIBLE);
+    }
+    i.sss("qj.page", "" + pageNo);
+    new Thread(new Runnable() {
+        public void run() {
+            String k = (String) i.sss("qj.kind");
+            int c = Integer.parseInt(String.valueOf(i.sss("qj.cat")));
+            int p = Integer.parseInt(String.valueOf(i.sss("qj.page")));
+            ArrayList items = "qikan".equals(k) ? core_magazines(c, p, 30) : core_books(c, p, 30);
+            i.sss("qj.result", items);
+            i.syso("QJ shelf " + k + " cat=" + c + " page=" + p + " n=" + items.size());
+            activity.runOnUiThread(new Runnable() {
+                public void run() { pages_renderShelf(); }
+            });
+        }
+    }).start();
+}
+
+public void pages_renderShelf() {
+    int p = Integer.parseInt(String.valueOf(i.sss("qj.page")));
+    ArrayList items = (ArrayList) i.sss("qj.result");
+    if (p == 1) list_clear(144);
+    list_rows(144, items);
+
+    TextView st = (TextView) activity.findViewById(146);
+    if (st != null) {
+        if (items.size() == 0) {
+            st.setText(p == 1 ? "这个分类暂时没有内容" : "没有更多了");
+            st.setVisibility(View.VISIBLE);
+        } else {
+            st.setVisibility(View.GONE);
+        }
+    }
+    MaterialButton more = (MaterialButton) activity.findViewById(145);
+    if (more != null) more.setVisibility(items.size() >= 30 ? View.VISIBLE : View.GONE);
+}
+
+public void more(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_list");
+    int p = Integer.parseInt(String.valueOf(i.sss("qj.page"))) + 1;
+    pages_load(p);
+}
+
+// ---------- 详情 / 期次 ----------
+
+public void detail() {
+    i.fn("qj_ui"); i.fn("qj_list"); i.fn("qj_core"); i.fn("qj_store");
+    View root = activity.findViewById(1);
+    if (root != null) root.setBackgroundColor(ui_c("surface"));
+    View bar = activity.findViewById(10);
+    if (bar != null) bar.setBackgroundColor(ui_c("surfaceContainer"));
+    ImageView back = (ImageView) activity.findViewById(5);
+    if (back != null) {
+        back.setImageBitmap(ui_iconSize("back", 44, (float) 1.3));
+        back.setColorFilter(ui_c("primary"));
+    }
+
+    TextView t = (TextView) activity.findViewById(7);
+    if (t != null) {
+        t.setTextColor(ui_c("onSurface"));
+        t.setTypeface(Typeface.create("serif", Typeface.BOLD));
+    }
+    TextView sub = (TextView) activity.findViewById(8);
+    if (sub != null) sub.setTextColor(ui_c("onSurfaceVariant"));
+    TextView sum = (TextView) activity.findViewById(9);
+    if (sum != null) sum.setTextColor(ui_c("onSurface"));
+
+    MaterialButton btn = (MaterialButton) activity.findViewById(11);
+    if (btn != null) {
+        btn.setBackgroundTintList(ColorStateList.valueOf(ui_c("primary")));
+        btn.setTextColor(ui_c("onPrimary"));
+        btn.setCornerRadius(ui_dp(26));
+    }
+
+    String itemJson = (String) i.sss("qj.item");
+    if (itemJson == null) {
+        i.syso("DETAIL no item");
+        return;
+    }
+    try {
+        JSONObject it = new JSONObject(itemJson);
+        String type = it.optString("type");
+        if (t != null) t.setText(it.optString("title"));
+        String line = it.optString("author");
+        if ("magazine".equals(type)) line = "期刊 · ISSN " + line;
+        if ("issue".equals(type)) line = it.optString("issueLabel");
+        if (sub != null) sub.setText(line);
+        if (sum != null) sum.setText(it.optString("summary"));
+        String cov = it.optString("cover");
+        ImageView cover = (ImageView) activity.findViewById(6);
+        if (cover != null && cov.length() > 0) i.us(cover, "src", cov);
+        if (btn != null) btn.setText("magazine".equals(type) ? "选择期次" : "开始阅读");
+    } catch (Throwable e) {
+        i.syso("DETAIL fail " + e);
+    }
+}
+
+public void action(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
+    String itemJson = (String) i.sss("qj.item");
+    try {
+        JSONObject it = new JSONObject(itemJson);
+        if ("magazine".equals(it.optString("type"))) {
+            pick();
+        } else {
+            open();
+        }
+    } catch (Throwable e) {
+        i.syso("ACTION fail " + e);
+    }
+}
+
+public void open() {
+    i.sss("qj.page", "1");
+    i.uigo("reader.iyu");
+}
+
+public void pick() {
+    View scrim = activity.findViewById(20);
+    if (scrim != null) scrim.setVisibility(View.VISIBLE);
+    new Thread(new Runnable() {
+        public void run() {
+            try {
+                JSONObject it = new JSONObject((String) i.sss("qj.item"));
+                ArrayList issues = core_issues(it.optInt("magazineId"));
+                i.sss("qj.issues", issues);
+                i.syso("PICK issues=" + issues.size());
+                activity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        list_clear(24);
+                        list_issueRows(24, (ArrayList) i.sss("qj.issues"));
+                    }
+                });
+            } catch (Throwable e) {
+                i.syso("PICK fail " + e);
+            }
+        }
+    }).start();
+}
+
+public void closePick(Object arg) {
+    View scrim = activity.findViewById(20);
+    if (scrim != null) scrim.setVisibility(View.GONE);
+}
+
+public void backKey(String tag, Object kc) {
+    int c = -1;
+    try { c = Integer.parseInt(String.valueOf(kc)); } catch (Throwable t) { }
+    if (c == 4) activity.finish();
+}
+
+public void back(Object kc) {
+    int c = -1;
+    try {
+        c = Integer.parseInt(String.valueOf(kc));
+    } catch (Throwable t) {
+    }
+    if (c == 4) activity.finish();
+}
+
+
+// ---------- 足迹 ----------
+
+public HashMap pages_histMap(String line) {
+    try {
+        JSONObject o = new JSONObject(line);
+        HashMap m = new HashMap();
+        m.put("key", o.optString("key"));
+        m.put("type", o.optString("type"));
+        m.put("title", o.optString("title"));
+        m.put("author", o.optString("author"));
+        m.put("cover", o.optString("cover"));
+        m.put("surl", o.optString("surl"));
+        m.put("magazineId", "" + o.optInt("magazineId"));
+        m.put("issueNum", o.optString("issueNum"));
+        m.put("issueLabel", o.optString("issueLabel"));
+        m.put("page", "" + o.optInt("page"));
+        m.put("total", "" + o.optInt("total"));
+        return m;
+    } catch (Throwable t) {
+        return null;
+    }
+}
+
+public void trail(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_store"); i.fn("qj_list");
+    LinearLayout host = (LinearLayout) activity.findViewById(15);
+    if (host == null) {
+        i.syso("TRAIL host null");
+        return;
+    }
+    host.removeAllViews();
+
+    LinearLayout head = new LinearLayout(activity);
+    head.setOrientation(LinearLayout.HORIZONTAL);
+    head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    head.setPadding(ui_dp(16), ui_dp(16), ui_dp(8), ui_dp(8));
+    TextView title = new TextView(activity);
+    title.setText("阅读足迹");
+    title.setTextSize(20);
+    title.setTypeface(Typeface.create("serif", Typeface.BOLD));
+    title.setTextColor(ui_c("onSurface"));
+    head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView clear = new TextView(activity);
+    clear.setText("清空");
+    clear.setTextSize(14);
+    clear.setTextColor(ui_c("primary"));
+    clear.setGravity(android.view.Gravity.CENTER);
+    clear.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) { clearTrail(0); }
+    });
+    head.addView(clear, new LinearLayout.LayoutParams(ui_dp(56), ui_dp(44)));
+    host.addView(head);
+
+    ArrayList lines = store_history();
+    ArrayList items = new ArrayList();
+    for (int k = 0; k < lines.size(); k++) {
+        HashMap m = pages_histMap((String) lines.get(k));
+        if (m != null) items.add(m);
+    }
+
+    if (items.size() == 0) {
+        TextView empty = new TextView(activity);
+        empty.setText("还没有阅读记录，去读一本吧");
+        empty.setTextSize(14);
+        empty.setTextColor(ui_c("onSurfaceVariant"));
+        empty.setGravity(android.view.Gravity.CENTER);
+        empty.setPadding(ui_dp(24), ui_dp(24), ui_dp(24), ui_dp(24));
+        host.addView(empty);
+    } else {
+        LinearLayout list = new LinearLayout(activity);
+        list.setOrientation(LinearLayout.VERTICAL);
+        host.addView(list);
+        list_historyRowsView(list, items);
+    }
+    i.syso("QJ trail n=" + items.size());
+}
+
+public void clearTrail(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_store"); i.fn("qj_list");
+    new MaterialAlertDialogBuilder(activity)
+        .setTitle("清空阅读足迹？")
+        .setMessage("会移除本机保存的全部阅读进度，不影响书刊本身。")
+        .setNegativeButton("取消", null)
+        .setPositiveButton("确认清空", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface d, int w) {
+                store_clearHistory();
+                trail(0);
+            }
+        })
+        .show();
+}

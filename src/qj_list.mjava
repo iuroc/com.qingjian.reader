@@ -1,0 +1,428 @@
+// 青简 · 列表项渲染。方法统一 list_ 前缀；依赖 qj_ui（ui_dp / ui_c）。
+
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.text.TextUtils;
+import android.view.View;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.util.ArrayList;
+import java.util.HashMap;
+import org.json.JSONObject;
+
+public void list_books(int containerId, ArrayList items) {
+    list_clear(containerId);
+    list_rows(containerId, items);
+}
+
+public void list_clear(int containerId) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host != null) host.removeAllViews();
+}
+
+public void list_rows(int containerId, ArrayList items) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    for (int k = 0; k < items.size(); k++) {
+        host.addView(list_row((HashMap) items.get(k)));
+        if (k < items.size() - 1) host.addView(list_divider());
+    }
+    i.syso("LIST rows n=" + items.size());
+}
+
+public void list_header(int containerId, String text) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    TextView t = new TextView(activity);
+    t.setText(text);
+    t.setTextSize(20);
+    t.setTextColor(ui_c("onSurface"));
+    t.setTypeface(Typeface.create("serif", Typeface.BOLD));
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+    lp.leftMargin = ui_dp(16);
+    lp.rightMargin = ui_dp(16);
+    lp.topMargin = ui_dp(20);
+    lp.bottomMargin = ui_dp(8);
+    t.setLayoutParams(lp);
+    host.addView(t);
+}
+
+public void list_cards(int containerId, ArrayList items) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    HorizontalScrollView hs = new HorizontalScrollView(activity);
+    hs.setHorizontalScrollBarEnabled(false);
+    LinearLayout row = new LinearLayout(activity);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setPadding(ui_dp(16), 0, ui_dp(4), 0);
+    hs.addView(row);
+    host.addView(hs);
+    for (int k = 0; k < items.size(); k++) row.addView(list_card((HashMap) items.get(k)));
+    i.syso("LIST cards n=" + items.size());
+}
+
+public View list_card(HashMap m) {
+    LinearLayout card = new LinearLayout(activity);
+    card.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ui_dp(132), -2);
+    clp.rightMargin = ui_dp(12);
+    card.setLayoutParams(clp);
+
+    ImageView cover = new ImageView(activity);
+    cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(ui_c("surfaceContainer"));
+    bg.setCornerRadius(ui_dp(8));
+    cover.setBackground(bg);
+    card.addView(cover, new LinearLayout.LayoutParams(ui_dp(132), ui_dp(176)));
+    String cov = (String) m.get("cover");
+    if (cov != null && cov.length() > 0) i.us(cover, "src", cov);
+
+    TextView title = new TextView(activity);
+    title.setText((String) m.get("title"));
+    title.setTextSize(14);
+    title.setTextColor(ui_c("onSurface"));
+    title.setTypeface(null, Typeface.BOLD);
+    title.setMaxLines(2);
+    title.setEllipsize(TextUtils.TruncateAt.END);
+    LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-1, -2);
+    tlp.topMargin = ui_dp(8);
+    card.addView(title, tlp);
+
+    TextView sub = new TextView(activity);
+    sub.setText((String) m.get("author"));
+    sub.setTextSize(12);
+    sub.setTextColor(ui_c("onSurfaceVariant"));
+    sub.setMaxLines(1);
+    sub.setEllipsize(TextUtils.TruncateAt.END);
+    LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+    slp.topMargin = ui_dp(2);
+    card.addView(sub, slp);
+
+    card.setTag(m);
+    card.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) {
+            HashMap item = (HashMap) v.getTag();
+            try {
+                i.sss("qj.item", new JSONObject(item).toString());
+                i.uigo("detail.iyu");
+            } catch (Throwable t) {
+                i.syso("LIST open fail " + t);
+            }
+        }
+    });
+    return card;
+}
+
+public void list_issueRows(int containerId, ArrayList items) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    host.removeAllViews();
+    for (int k = 0; k < items.size(); k++) {
+        HashMap m = (HashMap) items.get(k);
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(ui_dp(20), ui_dp(10), ui_dp(20), ui_dp(10));
+
+        ImageView cover = new ImageView(activity);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ui_c("surfaceContainer"));
+        bg.setCornerRadius(ui_dp(6));
+        cover.setBackground(bg);
+        row.addView(cover, new LinearLayout.LayoutParams(ui_dp(48), ui_dp(64)));
+        String cov = (String) m.get("cover");
+        if (cov != null && cov.length() > 0) i.us(cover, "src", cov);
+
+        LinearLayout col = new LinearLayout(activity);
+        col.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+        lp.leftMargin = ui_dp(12);
+        row.addView(col, lp);
+
+        TextView title = new TextView(activity);
+        title.setText((String) m.get("issueLabel"));
+        title.setTextSize(16);
+        title.setTextColor(ui_c("onSurface"));
+        title.setTypeface(null, Typeface.BOLD);
+        col.addView(title);
+
+        TextView sub = new TextView(activity);
+        sub.setText((String) m.get("title"));
+        sub.setTextSize(13);
+        sub.setTextColor(ui_c("onSurfaceVariant"));
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+        slp.topMargin = ui_dp(2);
+        col.addView(sub, slp);
+
+        row.setTag(m);
+        row.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                HashMap item = (HashMap) v.getTag();
+                try {
+                    JSONObject jo = new JSONObject(item);
+                    jo.put("type", "issue");
+                    i.sss("qj.item", jo.toString());
+                    i.sss("qj.page", "1");
+                    i.uigo("reader.iyu");
+                } catch (Throwable t) {
+                    i.syso("LIST issue open fail " + t);
+                }
+            }
+        });
+        host.addView(row);
+        if (k < items.size() - 1) host.addView(list_divider());
+    }
+    i.syso("LIST issues n=" + items.size());
+}
+
+public View list_divider() {
+    View v = new View(activity);
+    v.setBackgroundColor(ui_c("divider"));
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, ui_dp(1));
+    lp.leftMargin = ui_dp(16);
+    lp.rightMargin = ui_dp(16);
+    v.setLayoutParams(lp);
+    return v;
+}
+
+public View list_row(HashMap m) {
+    LinearLayout row = new LinearLayout(activity);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setPadding(ui_dp(16), ui_dp(12), ui_dp(16), ui_dp(12));
+
+    ImageView cover = new ImageView(activity);
+    cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(ui_c("surfaceContainer"));
+    bg.setCornerRadius(ui_dp(8));
+    cover.setBackground(bg);
+    LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ui_dp(88), ui_dp(120));
+    row.addView(cover, clp);
+    String cov = (String) m.get("cover");
+    if (cov != null && cov.length() > 0) i.us(cover, "src", cov);
+
+    LinearLayout col = new LinearLayout(activity);
+    col.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+    lp.leftMargin = ui_dp(12);
+    row.addView(col, lp);
+
+    TextView title = new TextView(activity);
+    title.setText((String) m.get("title"));
+    title.setTextSize(16);
+    title.setTextColor(ui_c("onSurface"));
+    title.setTypeface(null, Typeface.BOLD);
+    title.setMaxLines(2);
+    title.setEllipsize(TextUtils.TruncateAt.END);
+    col.addView(title);
+
+    TextView sub = new TextView(activity);
+    String author = (String) m.get("author");
+    if (author == null || author.length() == 0 || "null".equals(author)) author = "";
+    sub.setText(author);
+    sub.setTextSize(13);
+    sub.setTextColor(ui_c("onSurfaceVariant"));
+    sub.setMaxLines(1);
+    sub.setEllipsize(TextUtils.TruncateAt.END);
+    LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+    slp.topMargin = ui_dp(4);
+    col.addView(sub, slp);
+
+    TextView sum = new TextView(activity);
+    sum.setText((String) m.get("summary"));
+    sum.setTextSize(13);
+    sum.setTextColor(ui_c("onSurfaceVariant"));
+    sum.setMaxLines(2);
+    sum.setEllipsize(TextUtils.TruncateAt.END);
+    LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-2, -2);
+    mlp.topMargin = ui_dp(4);
+    col.addView(sum, mlp);
+
+    row.setTag(m);
+    row.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) {
+            HashMap item = (HashMap) v.getTag();
+            try {
+                i.sss("qj.item", new JSONObject(item).toString());
+                i.uigo("detail.iyu");
+            } catch (Throwable t) {
+                i.syso("LIST open fail " + t);
+            }
+        }
+    });
+    return row;
+}
+
+public void list_continue(int containerId, HashMap m) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    LinearLayout card = new LinearLayout(activity);
+    card.setOrientation(LinearLayout.HORIZONTAL);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(ui_c("primaryContainer"));
+    bg.setCornerRadius(ui_dp(12));
+    card.setBackground(bg);
+    card.setPadding(ui_dp(12), ui_dp(12), ui_dp(12), ui_dp(12));
+    LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
+    clp.leftMargin = ui_dp(16);
+    clp.rightMargin = ui_dp(16);
+    clp.topMargin = ui_dp(12);
+    card.setLayoutParams(clp);
+
+    ImageView cover = new ImageView(activity);
+    cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    GradientDrawable cbg = new GradientDrawable();
+    cbg.setColor(ui_c("surfaceContainer"));
+    cbg.setCornerRadius(ui_dp(6));
+    cover.setBackground(cbg);
+    card.addView(cover, new LinearLayout.LayoutParams(ui_dp(56), ui_dp(76)));
+    String cov = (String) m.get("cover");
+    if (cov != null && cov.length() > 0) i.us(cover, "src", cov);
+
+    LinearLayout col = new LinearLayout(activity);
+    col.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+    lp.leftMargin = ui_dp(12);
+    card.addView(col, lp);
+
+    TextView eyebrow = new TextView(activity);
+    eyebrow.setText("继续阅读");
+    eyebrow.setTextSize(12);
+    eyebrow.setTextColor(ui_c("onPrimaryContainer"));
+    col.addView(eyebrow);
+
+    TextView title = new TextView(activity);
+    title.setText((String) m.get("title"));
+    title.setTextSize(16);
+    title.setTextColor(ui_c("onPrimaryContainer"));
+    title.setTypeface(null, Typeface.BOLD);
+    title.setMaxLines(2);
+    title.setEllipsize(TextUtils.TruncateAt.END);
+    LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-2, -2);
+    tlp.topMargin = ui_dp(4);
+    col.addView(title, tlp);
+
+    TextView sub = new TextView(activity);
+    sub.setText("读到第 " + m.get("page") + " 页" + list_pagesOf(m));
+    sub.setTextSize(13);
+    sub.setTextColor(ui_c("onPrimaryContainer"));
+    LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+    slp.topMargin = ui_dp(4);
+    col.addView(sub, slp);
+
+    card.setTag(m);
+    card.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) {
+            HashMap item = (HashMap) v.getTag();
+            try {
+                i.sss("qj.item", new JSONObject(item).toString());
+                i.sss("qj.page", String.valueOf(item.get("page")));
+                i.uigo("reader.iyu");
+            } catch (Throwable t) {
+                i.syso("LIST continue fail " + t);
+            }
+        }
+    });
+    host.addView(card);
+}
+
+public String list_pagesOf(HashMap m) {
+    int total = 0;
+    try {
+        total = Integer.parseInt(String.valueOf(m.get("total")));
+    } catch (Throwable t) {
+    }
+    if (total <= 0) return "";
+    return " / 共 " + total + " 页";
+}
+
+public void list_historyRows(int containerId, ArrayList items) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    host.removeAllViews();
+    list_historyRowsView(host, items);
+}
+
+public void list_historyRowsView(LinearLayout host, ArrayList items) {
+    if (host == null) return;
+    for (int k = 0; k < items.size(); k++) {
+        HashMap m = (HashMap) items.get(k);
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(ui_dp(16), ui_dp(12), ui_dp(16), ui_dp(12));
+
+        ImageView cover = new ImageView(activity);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ui_c("surfaceContainer"));
+        bg.setCornerRadius(ui_dp(6));
+        cover.setBackground(bg);
+        row.addView(cover, new LinearLayout.LayoutParams(ui_dp(56), ui_dp(76)));
+        String cov = (String) m.get("cover");
+        if (cov != null && cov.length() > 0) i.us(cover, "src", cov);
+
+        LinearLayout col = new LinearLayout(activity);
+        col.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+        lp.leftMargin = ui_dp(12);
+        row.addView(col, lp);
+
+        TextView title = new TextView(activity);
+        title.setText((String) m.get("title"));
+        title.setTextSize(16);
+        title.setTextColor(ui_c("onSurface"));
+        title.setTypeface(null, Typeface.BOLD);
+        title.setMaxLines(1);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        col.addView(title);
+
+        int p = 1;
+        int total = 0;
+        try { p = Integer.parseInt(String.valueOf(m.get("page"))); } catch (Throwable t) { }
+        try { total = Integer.parseInt(String.valueOf(m.get("total"))); } catch (Throwable t) { }
+        boolean done = total > 0 && p >= total;
+
+        TextView sub = new TextView(activity);
+        sub.setText(done ? "已读完" : ("读到第 " + p + " 页" + list_pagesOf(m)));
+        sub.setTextSize(13);
+        sub.setTextColor(done ? ui_c("primary") : ui_c("onSurfaceVariant"));
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+        slp.topMargin = ui_dp(2);
+        col.addView(sub, slp);
+
+        if (total <= 0) total = 100;
+        if (p < 0) p = 0;
+        if (p > total) p = total;
+        LinearLayout bar = new LinearLayout(activity);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        View filled = new View(activity);
+        filled.setBackgroundColor(ui_c("primary"));
+        View rest = new View(activity);
+        rest.setBackgroundColor(ui_c("divider"));
+        bar.addView(filled, new LinearLayout.LayoutParams(0, -1, (float) p));
+        bar.addView(rest, new LinearLayout.LayoutParams(0, -1, (float) (total - p + 1)));
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, ui_dp(4));
+        blp.topMargin = ui_dp(8);
+        col.addView(bar, blp);
+
+        row.setTag(m);
+        row.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                HashMap item = (HashMap) v.getTag();
+                try {
+                    i.sss("qj.item", new JSONObject(item).toString());
+                    i.sss("qj.page", String.valueOf(item.get("page")));
+                    i.uigo("reader.iyu");
+                } catch (Throwable t) {
+                    i.syso("LIST history open fail " + t);
+                }
+            }
+        });
+        host.addView(row);
+        if (k < items.size() - 1) host.addView(list_divider());
+    }
+    i.syso("LIST history n=" + items.size());
+}

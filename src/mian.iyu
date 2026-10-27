@@ -1,0 +1,182 @@
+<View id="1" did="0" type="LinearLayout">
+<ppt>width=-1
+height=-1
+orientation=vertical
+backgroundcolor=#FBF8F1</ppt>
+<event></event>
+</View>
+<View id="2" did="1" type="com.google.android.material.appbar.MaterialToolbar">
+<ppt>width=-1
+height=56dp
+backgroundcolor=#FBF8F1</ppt>
+<event></event>
+</View>
+<View id="3" did="1" type="FrameLayout">
+<ppt>width=-1
+height=0
+layout_weight=1</ppt>
+<event></event>
+</View>
+<View id="10" did="3" type="ScrollView">
+<ppt>width=-1
+height=-1
+scrollbars=none
+overScrollMode=never</ppt>
+<event></event>
+</View>
+<View id="13" did="10" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=vertical</ppt>
+<event></event>
+</View>
+<View id="11" did="3" type="ScrollView">
+<ppt>width=-1
+height=-1
+scrollbars=none
+overScrollMode=never
+visibility=gone</ppt>
+<event></event>
+</View>
+<View id="14" did="11" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=vertical</ppt>
+<event></event>
+</View>
+<View id="141" did="14" type="com.google.android.material.tabs.TabLayout">
+<ppt>width=-1
+height=-2</ppt>
+<event></event>
+</View>
+<View id="142" did="14" type="HorizontalScrollView">
+<ppt>width=-1
+height=-2
+scrollbars=none
+overScrollMode=never</ppt>
+<event></event>
+</View>
+<View id="143" did="142" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=horizontal</ppt>
+<event></event>
+</View>
+<View id="146" did="14" type="TextView">
+<ppt>width=-1
+height=-2
+text=正在加载
+textsize=13sp
+textcolor=#414944
+gravity=center
+padding=10dp</ppt>
+<event></event>
+</View>
+<View id="144" did="14" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=vertical</ppt>
+<event></event>
+</View>
+<View id="145" did="14" type="com.google.android.material.button.MaterialButton">
+<ppt>width=-1
+height=44dp
+text=加载更多
+textsize=14sp
+layout_marginleft=16dp
+layout_marginright=16dp
+layout_margintop=12dp
+layout_marginbottom=16dp
+visibility=gone</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.more", 0)</eventItme></event>
+</View>
+<View id="12" did="3" type="ScrollView">
+<ppt>width=-1
+height=-1
+scrollbars=none
+overScrollMode=never
+visibility=gone</ppt>
+<event></event>
+</View>
+<View id="15" did="12" type="LinearLayout">
+<ppt>width=-1
+height=-2
+orientation=vertical</ppt>
+<event></event>
+</View>
+<View id="20" did="1" type="LinearLayout">
+<ppt>width=-1
+height=64dp
+orientation=horizontal
+backgroundcolor=#F5F2EA</ppt>
+<event></event>
+</View>
+<View id="21" did="20" type="LinearLayout">
+<ppt>width=0
+height=-1
+orientation=vertical
+gravity=center
+layout_weight=1</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.tab", 0)</eventItme></event>
+</View>
+<View id="24" did="21" type="ImageView">
+<ppt>width=24dp
+height=24dp</ppt>
+<event></event>
+</View>
+<View id="27" did="21" type="TextView">
+<ppt>width=-2
+height=-2
+text=精选
+textsize=11sp
+textcolor=#414944
+layout_margintop=2dp</ppt>
+<event></event>
+</View>
+<View id="22" did="20" type="LinearLayout">
+<ppt>width=0
+height=-1
+orientation=vertical
+gravity=center
+layout_weight=1</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.tab", 1)</eventItme></event>
+</View>
+<View id="25" did="22" type="ImageView">
+<ppt>width=24dp
+height=24dp</ppt>
+<event></event>
+</View>
+<View id="28" did="22" type="TextView">
+<ppt>width=-2
+height=-2
+text=书刊
+textsize=11sp
+textcolor=#414944
+layout_margintop=2dp</ppt>
+<event></event>
+</View>
+<View id="23" did="20" type="LinearLayout">
+<ppt>width=0
+height=-1
+orientation=vertical
+gravity=center
+layout_weight=1</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_pages.tab", 2)</eventItme></event>
+</View>
+<View id="26" did="23" type="ImageView">
+<ppt>width=24dp
+height=24dp</ppt>
+<event></event>
+</View>
+<View id="29" did="23" type="TextView">
+<ppt>width=-2
+height=-2
+text=足迹
+textsize=11sp
+textcolor=#414944
+layout_margintop=2dp</ppt>
+<event></event>
+</View>
+<UIEventset><eventItme type="loading">
+call(null, "mjava", "qj_pages.boot")
+</eventItme></UIEventset>
