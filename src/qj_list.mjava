@@ -8,6 +8,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.json.JSONObject;
@@ -43,7 +44,7 @@ public void list_header(int containerId, String text) {
     LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
     lp.leftMargin = ui_dp(16);
     lp.rightMargin = ui_dp(16);
-    lp.topMargin = ui_dp(20);
+    lp.topMargin = ui_dp(24);
     lp.bottomMargin = ui_dp(8);
     t.setLayoutParams(lp);
     host.addView(t);
@@ -82,7 +83,7 @@ public View list_card(HashMap m) {
 
     TextView title = new TextView(activity);
     title.setText((String) m.get("title"));
-    title.setTextSize(14);
+    title.setTextSize(16);
     title.setTextColor(ui_c("onSurface"));
     title.setTypeface(null, Typeface.BOLD);
     title.setMaxLines(2);
@@ -93,7 +94,7 @@ public View list_card(HashMap m) {
 
     TextView sub = new TextView(activity);
     sub.setText((String) m.get("author"));
-    sub.setTextSize(12);
+    sub.setTextSize(13);
     sub.setTextColor(ui_c("onSurfaceVariant"));
     sub.setMaxLines(1);
     sub.setEllipsize(TextUtils.TruncateAt.END);
@@ -113,11 +114,17 @@ public View list_card(HashMap m) {
             }
         }
     });
+    ui_rippleView(card);
     return card;
 }
 
 public void list_issueRows(int containerId, ArrayList items) {
     LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    list_issueRowsView(host, items);
+}
+
+public void list_issueRowsView(LinearLayout host, ArrayList items) {
     if (host == null) return;
     host.removeAllViews();
     for (int k = 0; k < items.size(); k++) {
@@ -162,6 +169,11 @@ public void list_issueRows(int containerId, ArrayList items) {
             public void onClick(View v) {
                 HashMap item = (HashMap) v.getTag();
                 try {
+                    Object sheet = i.sss("qj.sheet");
+                    if (sheet instanceof BottomSheetDialog) {
+                        try { ((BottomSheetDialog) sheet).dismiss(); } catch (Throwable t2) { }
+                        i.sss("qj.sheet", "");
+                    }
                     JSONObject jo = new JSONObject(item);
                     jo.put("type", "issue");
                     i.sss("qj.item", jo.toString());
@@ -172,6 +184,7 @@ public void list_issueRows(int containerId, ArrayList items) {
                 }
             }
         });
+        ui_rippleView(row);
         host.addView(row);
         if (k < items.size() - 1) host.addView(list_divider());
     }
@@ -191,7 +204,7 @@ public View list_divider() {
 public View list_row(HashMap m) {
     LinearLayout row = new LinearLayout(activity);
     row.setOrientation(LinearLayout.HORIZONTAL);
-    row.setPadding(ui_dp(16), ui_dp(12), ui_dp(16), ui_dp(12));
+    row.setPadding(ui_dp(16), ui_dp(16), ui_dp(16), ui_dp(16));
 
     ImageView cover = new ImageView(activity);
     cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -253,6 +266,7 @@ public View list_row(HashMap m) {
             }
         }
     });
+    ui_rippleView(row);
     return row;
 }
 
@@ -264,8 +278,8 @@ public void list_continue(int containerId, HashMap m) {
     GradientDrawable bg = new GradientDrawable();
     bg.setColor(ui_c("primaryContainer"));
     bg.setCornerRadius(ui_dp(12));
-    card.setBackground(bg);
-    card.setPadding(ui_dp(12), ui_dp(12), ui_dp(12), ui_dp(12));
+    ui_rippleOn(card, bg);
+    card.setPadding(ui_dp(16), ui_dp(16), ui_dp(16), ui_dp(16));
     LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
     clp.leftMargin = ui_dp(16);
     clp.rightMargin = ui_dp(16);
@@ -290,7 +304,7 @@ public void list_continue(int containerId, HashMap m) {
 
     TextView eyebrow = new TextView(activity);
     eyebrow.setText("继续阅读");
-    eyebrow.setTextSize(12);
+    eyebrow.setTextSize(13);
     eyebrow.setTextColor(ui_c("onPrimaryContainer"));
     col.addView(eyebrow);
 
@@ -319,7 +333,7 @@ public void list_continue(int containerId, HashMap m) {
             HashMap item = (HashMap) v.getTag();
             try {
                 i.sss("qj.item", new JSONObject(item).toString());
-                i.sss("qj.page", String.valueOf(item.get("page")));
+                i.sss("qj.page", list_s(item.get("page")));
                 i.uigo("reader.iyu");
             } catch (Throwable t) {
                 i.syso("LIST continue fail " + t);
@@ -332,7 +346,7 @@ public void list_continue(int containerId, HashMap m) {
 public String list_pagesOf(HashMap m) {
     int total = 0;
     try {
-        total = Integer.parseInt(String.valueOf(m.get("total")));
+        total = Integer.parseInt(list_s(m.get("total")));
     } catch (Throwable t) {
     }
     if (total <= 0) return "";
@@ -352,7 +366,7 @@ public void list_historyRowsView(LinearLayout host, ArrayList items) {
         HashMap m = (HashMap) items.get(k);
         LinearLayout row = new LinearLayout(activity);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(ui_dp(16), ui_dp(12), ui_dp(16), ui_dp(12));
+        row.setPadding(ui_dp(16), ui_dp(16), ui_dp(16), ui_dp(16));
 
         ImageView cover = new ImageView(activity);
         cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -381,8 +395,8 @@ public void list_historyRowsView(LinearLayout host, ArrayList items) {
 
         int p = 1;
         int total = 0;
-        try { p = Integer.parseInt(String.valueOf(m.get("page"))); } catch (Throwable t) { }
-        try { total = Integer.parseInt(String.valueOf(m.get("total"))); } catch (Throwable t) { }
+        try { p = Integer.parseInt(list_s(m.get("page"))); } catch (Throwable t) { }
+        try { total = Integer.parseInt(list_s(m.get("total"))); } catch (Throwable t) { }
         boolean done = total > 0 && p >= total;
 
         TextView sub = new TextView(activity);
@@ -414,15 +428,49 @@ public void list_historyRowsView(LinearLayout host, ArrayList items) {
                 HashMap item = (HashMap) v.getTag();
                 try {
                     i.sss("qj.item", new JSONObject(item).toString());
-                    i.sss("qj.page", String.valueOf(item.get("page")));
+                    i.sss("qj.page", list_s(item.get("page")));
                     i.uigo("reader.iyu");
                 } catch (Throwable t) {
                     i.syso("LIST history open fail " + t);
                 }
             }
         });
+        ui_rippleView(row);
         host.addView(row);
         if (k < items.size() - 1) host.addView(list_divider());
     }
     i.syso("LIST history n=" + items.size());
+}
+
+
+public void list_searchBar(int containerId) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    TextView bar = new TextView(activity);
+    bar.setText("搜索书刊、作者、出版社");
+    bar.setTextSize(16);
+    bar.setTextColor(ui_c("onSurfaceVariant"));
+    bar.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(ui_c("surfaceContainer"));
+    bg.setCornerRadius(ui_dp(28));
+    ui_rippleOn(bar, bg);
+    bar.setPadding(ui_dp(20), 0, ui_dp(20), 0);
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, ui_dp(56));
+    lp.leftMargin = ui_dp(16);
+    lp.rightMargin = ui_dp(16);
+    lp.topMargin = 0;
+    lp.bottomMargin = ui_dp(8);
+    bar.setLayoutParams(lp);
+    bar.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) {
+            i.uigo("search.iyu");
+        }
+    });
+    host.addView(bar);
+}
+
+
+public String list_s(Object o) {
+    return o == null ? "" : String.valueOf(o);
 }

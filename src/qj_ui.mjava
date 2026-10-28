@@ -5,11 +5,18 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
 public int ui_dp(int v) {
     return (int) (v * activity.getResources().getDisplayMetrics().density + 0.5f);
@@ -37,6 +44,7 @@ public int ui_c(String token) {
     if ("tertiary".equals(token)) return Color.parseColor(d ? "#E4C28C" : "#79582B");
     if ("outline".equals(token)) return Color.parseColor(d ? "#8A938C" : "#717973");
     if ("divider".equals(token)) return Color.parseColor(d ? "#333630" : "#E9E5DC");
+    if ("ripple".equals(token)) return Color.parseColor(d ? "#38E3E3DA" : "#241B1C18");
     return Color.parseColor("#FF00FF");
 }
 
@@ -83,6 +91,13 @@ public Bitmap ui_iconSize(String name, int sizeDp, float strokeDp) {
         c.drawLine((float) (n * 62 / 100), (float) n / 2, (float) (n * 38 / 100), (float) n / 2, p);
         c.drawLine((float) (n * 38 / 100), (float) n / 2, (float) (n * 5 / 10), (float) (n * 38 / 100), p);
         c.drawLine((float) (n * 38 / 100), (float) n / 2, (float) (n * 5 / 10), (float) (n * 62 / 100), p);
+    } else if ("up".equals(name)) {
+        c.drawLine((float) n / 2, (float) (n * 7 / 10), (float) n / 2, (float) (n * 3 / 10), p);
+        c.drawLine((float) (n * 35 / 100), (float) (n * 45 / 100), (float) n / 2, (float) (n * 3 / 10), p);
+        c.drawLine((float) (n * 65 / 100), (float) (n * 45 / 100), (float) n / 2, (float) (n * 3 / 10), p);
+    } else if ("close".equals(name)) {
+        c.drawLine((float) (n * 3 / 10), (float) (n * 3 / 10), (float) (n * 7 / 10), (float) (n * 7 / 10), p);
+        c.drawLine((float) (n * 7 / 10), (float) (n * 3 / 10), (float) (n * 3 / 10), (float) (n * 7 / 10), p);
     } else if ("book".equals(name)) {
         c.drawRect((float) (n * 25 / 100), (float) (n * 2 / 10), (float) (n * 75 / 100), (float) (n * 8 / 10), p);
         c.drawLine((float) (n * 4 / 10), (float) (n * 2 / 10), (float) (n * 4 / 10), (float) (n * 8 / 10), p);
@@ -105,7 +120,11 @@ public void ui_nav(int active) {
             label.setTypeface(null, on ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         }
         if (icon != null) icon.setColorFilter(on ? ui_c("primary") : ui_c("onSurfaceVariant"));
-        if (item != null) item.setBackground(null);
+        // 只在没有背景时建一次涟漪底；不能用 tag 判断（iApp 自己会占 tag），
+        // 也不能每次重建（会打断涟漪动画，松手时闪一下）
+        if (item != null && item.getBackground() == null) {
+            ui_rippleView(item, 16);
+        }
     }
 }
 
@@ -118,4 +137,94 @@ public void ui_switch(Object which) {
         if (v != null) v.setVisibility(k == w ? View.VISIBLE : View.GONE);
     }
     ui_nav(w);
+}
+
+
+// ppt 声明的 TextInputLayout 盒子默认不画：抄 til.getContext() 的内置样式，去掉原生背景再让 Material 贴回盒子
+public void ui_fixField(int id) {
+    TextInputLayout til = (TextInputLayout) activity.findViewById(id);
+    if (til == null) return;
+    TextInputEditText et = (TextInputEditText) til.getEditText();
+    if (et == null) return;
+    TextInputEditText ref = new TextInputEditText(til.getContext());
+    float d = activity.getResources().getDisplayMetrics().density;
+    et.setTextSize(ref.getTextSize() / d);
+    et.setPadding(ref.getPaddingLeft(), ref.getPaddingTop(),
+                  ref.getPaddingRight(), ref.getPaddingBottom());
+    et.setBackground(null);
+    et.setSingleLine(true);
+    et.setVerticalScrollBarEnabled(false);
+    et.setHorizontallyScrolling(true);
+    til.updateEditTextBoxBackgroundIfNeeded();
+}
+
+
+// 点击涟漪：无内容的控件用遮罩，已有底色的控件用内容 Drawable 包一层
+public void ui_rippleView(View v) {
+    ui_rippleView(v, 0);
+}
+
+public void ui_rippleView(View v, int radiusDp) {
+    if (v == null) return;
+    GradientDrawable mask = new GradientDrawable();
+    mask.setColor(Color.WHITE);
+    if (radiusDp > 0) mask.setCornerRadius(ui_dp(radiusDp));
+    RippleDrawable rd = new RippleDrawable(ColorStateList.valueOf(ui_c("ripple")), null, mask);
+    v.setBackground(rd);
+}
+
+public void ui_rippleOn(View v, Drawable content) {
+    if (v == null) return;
+    RippleDrawable rd = new RippleDrawable(ColorStateList.valueOf(ui_c("ripple")), content, null);
+    v.setBackground(rd);
+}
+
+public void ui_ripple(int id) {
+    ui_rippleView(activity.findViewById(id));
+}
+
+
+// 整页悬浮 loading：挂在首页 FrameLayout(3) 上层，不占列表高度
+public void ui_loading(boolean show, String text) {
+    FrameLayout host = (FrameLayout) activity.findViewById(3);
+    if (host == null) return;
+    View ov = activity.findViewById(160);
+    if (!show) {
+        if (ov != null) ov.setVisibility(View.GONE);
+        return;
+    }
+    if (ov == null) {
+        FrameLayout overlay = new FrameLayout(activity);
+        overlay.setId(160);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ui_c("surface"));
+        overlay.setBackground(bg);
+
+        LinearLayout box = new LinearLayout(activity);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(android.view.Gravity.CENTER);
+
+        CircularProgressIndicator cp = new CircularProgressIndicator(activity);
+        cp.setIndeterminate(true);
+        cp.setIndicatorColor(new int[]{ui_c("primary")});
+        box.addView(cp, new LinearLayout.LayoutParams(ui_dp(28), ui_dp(28)));
+
+        TextView t = new TextView(activity);
+        t.setId(161);
+        t.setText(text);
+        t.setTextSize(13);
+        t.setTextColor(ui_c("onSurfaceVariant"));
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
+        tp.topMargin = ui_dp(12);
+        box.addView(t, tp);
+
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2);
+        blp.gravity = android.view.Gravity.CENTER;
+        overlay.addView(box, blp);
+        host.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+    } else {
+        TextView t = (TextView) ov.findViewById(161);
+        if (t != null) t.setText(text);
+        ov.setVisibility(View.VISIBLE);
+    }
 }

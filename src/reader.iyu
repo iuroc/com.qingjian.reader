@@ -14,8 +14,9 @@ backgroundcolor=#FBF8F1</ppt>
 <event></event>
 </View>
 <View id="3" did="2" type="ImageView">
-<ppt>width=44dp
-height=44dp</ppt>
+<ppt>width=48dp
+height=48dp
+layout_marginleft=8dp</ppt>
 <event><eventItme type="clicki">call(null, "mjava", "qj_reader.back", 4)</eventItme></event>
 </View>
 <View id="4" did="2" type="TextView">
@@ -33,10 +34,19 @@ ellipsize=end</ppt>
 <ppt>width=56dp
 height=48dp
 text=目录
-textsize=14sp
+textsize=16sp
 textcolor=#3F6459
 gravity=center</ppt>
 <event><eventItme type="clicki">call(null, "mjava", "qj_reader.toc", 0)</eventItme></event>
+</View>
+<View id="21" did="2" type="TextView">
+<ppt>width=48dp
+height=48dp
+text=Aa
+textsize=16sp
+textcolor=#3F6459
+gravity=center</ppt>
+<event><eventItme type="clicki">call(null, "mjava", "qj_reader.settings", 0)</eventItme></event>
 </View>
 <View id="6" did="1" type="FrameLayout">
 <ppt>width=-1
@@ -49,40 +59,17 @@ layout_weight=1</ppt>
 height=-1</ppt>
 <event></event>
 </View>
-<View id="8" did="6" type="LinearLayout">
-<ppt>width=-1
-height=-1
-orientation=horizontal</ppt>
-<event></event>
-</View>
-<View id="9" did="8" type="View">
-<ppt>width=0
-height=-1
-layout_weight=1</ppt>
-<event><eventItme type="clicki">call(null, "mjava", "qj_reader.prev", 0)</eventItme></event>
-</View>
-<View id="10" did="8" type="View">
-<ppt>width=0
-height=-1
-layout_weight=1</ppt>
-<event></event>
-</View>
-<View id="11" did="8" type="View">
-<ppt>width=0
-height=-1
-layout_weight=1</ppt>
-<event><eventItme type="clicki">call(null, "mjava", "qj_reader.next", 0)</eventItme></event>
-</View>
 <View id="12" did="1" type="LinearLayout">
 <ppt>width=-1
-height=88dp
+height=56dp
 orientation=vertical
+gravity=center_vertical
 backgroundcolor=#F5F2EA</ppt>
 <event></event>
 </View>
 <View id="13" did="12" type="LinearLayout">
 <ppt>width=-1
-height=44dp
+height=48dp
 orientation=horizontal
 gravity=center_vertical</ppt>
 <event></event>
@@ -91,7 +78,7 @@ gravity=center_vertical</ppt>
 <ppt>width=0
 height=-1
 text=上一页
-textsize=14sp
+textsize=16sp
 textcolor=#3F6459
 gravity=center
 layout_weight=1</ppt>
@@ -111,45 +98,11 @@ layout_weight=2</ppt>
 <ppt>width=0
 height=-1
 text=下一页
-textsize=14sp
+textsize=16sp
 textcolor=#3F6459
 gravity=center
 layout_weight=1</ppt>
 <event><eventItme type="clicki">call(null, "mjava", "qj_reader.next", 0)</eventItme></event>
-</View>
-<View id="17" did="12" type="LinearLayout">
-<ppt>width=-1
-height=44dp
-orientation=horizontal
-gravity=center</ppt>
-<event></event>
-</View>
-<View id="18" did="17" type="TextView">
-<ppt>width=56dp
-height=44dp
-text=小
-textsize=14sp
-textcolor=#414944
-gravity=center</ppt>
-<event><eventItme type="clicki">call(null, "mjava", "qj_reader.font", 16)</eventItme></event>
-</View>
-<View id="19" did="17" type="TextView">
-<ppt>width=56dp
-height=44dp
-text=中
-textsize=14sp
-textcolor=#3F6459
-gravity=center</ppt>
-<event><eventItme type="clicki">call(null, "mjava", "qj_reader.font", 18)</eventItme></event>
-</View>
-<View id="20" did="17" type="TextView">
-<ppt>width=56dp
-height=44dp
-text=大
-textsize=14sp
-textcolor=#414944
-gravity=center</ppt>
-<event><eventItme type="clicki">call(null, "mjava", "qj_reader.font", 21)</eventItme></event>
 </View>
 <UIEventset><eventItme type="loading">
 call(null, "mjava", "qj_reader.boot")

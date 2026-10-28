@@ -3,17 +3,35 @@
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.DialogInterface;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
+import androidx.core.widget.NestedScrollView;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.shape.MaterialShapeDrawable;
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public void boot() {
@@ -25,10 +43,48 @@ public void boot() {
 public void tab(Object which) {
     i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
     int w = Integer.parseInt(String.valueOf(which));
+    i.sss("qj.tab", "" + w);
     ui_switch(w);
+    ui_loading(false, "");
+    View stickyHead = activity.findViewById(140);
+    if (stickyHead != null) {
+        if (w == 1) {
+            stickyHead.setVisibility(View.VISIBLE);
+            stickyHead.setTranslationY((float) 0);
+            i.sss("qj.sticky.show", "1");
+        } else {
+            stickyHead.setVisibility(View.GONE);
+            pages_fabShow(false);
+        }
+    }
     if (w == 0) home();
     if (w == 1) shelf();
     if (w == 2) trail(0);
+}
+
+// 从阅读页退回本页：弹栈复用 Activity，loading 不会再跑，只走 resume。
+// 只有阅读进度真的写过（qj.hist.dirty）才重画当前这一屏，并保住滚动位置。
+public void resume(Object arg) {
+    if (!"1".equals(i.sss("qj.hist.dirty"))) return;
+    i.sss("qj.hist.dirty", "0");
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
+    Object t = i.sss("qj.tab");
+    int w = 0;
+    try {
+        w = Integer.parseInt(t == null ? "0" : String.valueOf(t));
+    } catch (Throwable e) {
+        w = 0;
+    }
+    if (w == 1) return;                                  // 书刊列表不显示进度
+    ScrollView sv = (ScrollView) activity.findViewById(w == 0 ? 10 : 12);
+    int y = sv == null ? 0 : sv.getScrollY();
+    if (w == 0) home(); else trail(0);
+    if (sv != null && y > 0) {
+        // 重画后子视图要重新量高，直接 scrollTo 会被旧高度夹住，等一帧再滚
+        sv.postDelayed(new Runnable() {
+            public void run() { sv.scrollTo(0, y); }
+        }, 60L);
+    }
 }
 
 // ---------- 精选 ----------
@@ -38,6 +94,7 @@ public void home() {
         pages_renderHome();
         return;
     }
+    ui_loading(true, "正在加载精选…");
     new Thread(new Runnable() {
         public void run() {
             ArrayList mags = core_magazines(6, 1, 6);
@@ -68,23 +125,53 @@ public ArrayList pages_pickNew(ArrayList a, ArrayList b) {
 }
 
 public void pages_renderHome() {
+    ui_loading(false, "");
     list_clear(13);
+    list_searchBar(13);
     ArrayList hist = store_history();
     if (hist.size() > 0) {
         HashMap h = pages_histMap((String) hist.get(0));
         if (h != null) list_continue(13, h);
     }
+    ArrayList mags2 = (ArrayList) i.sss("qj.home.mags");
+    ArrayList books2 = (ArrayList) i.sss("qj.home.books");
+    boolean magEmpty = (mags2 == null || mags2.size() == 0);
+    boolean bookEmpty = (books2 == null || books2.size() == 0);
+    if (magEmpty && bookEmpty) {
+        LinearLayout host = (LinearLayout) activity.findViewById(13);
+        TextView err = new TextView(activity);
+        err.setText("内容加载失败，点此重试");
+        err.setTextSize(16);
+        err.setTextColor(ui_c("primary"));
+        err.setGravity(android.view.Gravity.CENTER);
+        err.setPadding(ui_dp(24), ui_dp(48), ui_dp(24), ui_dp(24));
+        err.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                i.sss("qj.home.loaded", "0");
+                home();
+            }
+        });
+        host.addView(err);
+        return;
+    }
     list_header(13, "期刊精选");
-    list_cards(13, (ArrayList) i.sss("qj.home.mags"));
+    list_cards(13, mags2);
     list_header(13, "图书新书");
-    list_rows(13, (ArrayList) i.sss("qj.home.books"));
+    list_rows(13, books2);
     i.sss("qj.home.loaded", "1");
 }
 
 // ---------- 书刊 ----------
 
 public void shelf() {
-    if ("1".equals(i.sss("qj.shelf.loaded"))) return;
+    if ("1".equals(i.sss("qj.shelf.loaded"))) {
+        pages_bindScroll();
+        pages_headPad();
+        return;
+    }
+    pages_bindScroll();
+    pages_headPad();
+    pages_fab();
     pages_tabs();
     i.sss("qj.kind", "qikan");
     i.sss("qj.cat", "6");
@@ -97,6 +184,8 @@ public void pages_tabs() {
     TabLayout tl = (TabLayout) activity.findViewById(141);
     if (tl == null) return;
     tl.removeAllTabs();
+    tl.setBackgroundColor(ui_c("surface"));
+    tl.setElevation((float) 0);
     tl.setSelectedTabIndicatorColor(ui_c("primary"));
     tl.setTabTextColors(ui_c("onSurfaceVariant"), ui_c("primary"));
     tl.addTab(tl.newTab().setText("期刊"));
@@ -136,7 +225,7 @@ public void pages_chips() {
     String kind = (String) i.sss("qj.kind");
     String[] names = pages_names(kind);
     int[] ids = pages_ids(kind);
-    int cur = Integer.parseInt(String.valueOf(i.sss("qj.cat")));
+    int cur = pages_i(i.sss("qj.cat"), 6);
     for (int k = 0; k < names.length; k++) {
         Chip chip = new Chip(activity);
         chip.setText(names[k]);
@@ -163,17 +252,26 @@ public void pages_chips() {
 }
 
 public void pages_load(int pageNo) {
-    TextView st = (TextView) activity.findViewById(146);
-    if (st != null) {
-        st.setText("正在加载");
-        st.setVisibility(View.VISIBLE);
-    }
+    View statBox = activity.findViewById(146);
+    if (statBox != null) statBox.setVisibility(View.GONE);
     i.sss("qj.page", "" + pageNo);
+    if (pageNo == 1) {
+        ScrollView svTop = (ScrollView) activity.findViewById(11);
+        if (svTop != null) svTop.scrollTo(0, 0);
+        i.sss("qj.sticky.show", "1");
+        View hd = activity.findViewById(140);
+        if (hd != null) hd.animate().translationY((float) 0).setDuration(120).start();
+        pages_fabShow(false);
+
+        ui_loading(true, "正在加载书刊…");
+    } else {
+        pages_footer(true);
+    }
     new Thread(new Runnable() {
         public void run() {
             String k = (String) i.sss("qj.kind");
-            int c = Integer.parseInt(String.valueOf(i.sss("qj.cat")));
-            int p = Integer.parseInt(String.valueOf(i.sss("qj.page")));
+            int c = pages_i(i.sss("qj.cat"), 6);
+            int p = pages_i(i.sss("qj.page"), 1);
             ArrayList items = "qikan".equals(k) ? core_magazines(c, p, 30) : core_books(c, p, 30);
             i.sss("qj.result", items);
             i.syso("QJ shelf " + k + " cat=" + c + " page=" + p + " n=" + items.size());
@@ -185,18 +283,21 @@ public void pages_load(int pageNo) {
 }
 
 public void pages_renderShelf() {
-    int p = Integer.parseInt(String.valueOf(i.sss("qj.page")));
+    ui_loading(false, "");
+    pages_moreBusy(false);
+    int p = pages_i(i.sss("qj.page"), 1);
     ArrayList items = (ArrayList) i.sss("qj.result");
     if (p == 1) list_clear(144);
     list_rows(144, items);
 
-    TextView st = (TextView) activity.findViewById(146);
-    if (st != null) {
+    View statBox = activity.findViewById(146);
+    TextView st = (TextView) activity.findViewById(148);
+    if (statBox != null) {
         if (items.size() == 0) {
-            st.setText(p == 1 ? "这个分类暂时没有内容" : "没有更多了");
-            st.setVisibility(View.VISIBLE);
+            statBox.setVisibility(View.VISIBLE);
+            if (st != null) st.setText(p == 1 ? "这个分类暂时没有内容" : "没有更多了");
         } else {
-            st.setVisibility(View.GONE);
+            statBox.setVisibility(View.GONE);
         }
     }
     MaterialButton more = (MaterialButton) activity.findViewById(145);
@@ -205,7 +306,7 @@ public void pages_renderShelf() {
 
 public void more(Object arg) {
     i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_list");
-    int p = Integer.parseInt(String.valueOf(i.sss("qj.page"))) + 1;
+    int p = pages_i(i.sss("qj.page"), 1) + 1;
     pages_load(p);
 }
 
@@ -215,13 +316,16 @@ public void detail() {
     i.fn("qj_ui"); i.fn("qj_list"); i.fn("qj_core"); i.fn("qj_store");
     View root = activity.findViewById(1);
     if (root != null) root.setBackgroundColor(ui_c("surface"));
+    View topbar = activity.findViewById(30);
+    if (topbar != null) topbar.setBackgroundColor(ui_c("surface"));
     View bar = activity.findViewById(10);
     if (bar != null) bar.setBackgroundColor(ui_c("surfaceContainer"));
     ImageView back = (ImageView) activity.findViewById(5);
     if (back != null) {
-        back.setImageBitmap(ui_iconSize("back", 44, (float) 1.3));
+        back.setImageBitmap(ui_iconSize("back", 48, (float) 1.8));
         back.setColorFilter(ui_c("primary"));
     }
+    ui_ripple(5);
 
     TextView t = (TextView) activity.findViewById(7);
     if (t != null) {
@@ -245,10 +349,16 @@ public void detail() {
         i.syso("DETAIL no item");
         return;
     }
+    i.sss("qj.detail.item", itemJson);
     try {
         JSONObject it = new JSONObject(itemJson);
         String type = it.optString("type");
         if (t != null) t.setText(it.optString("title"));
+        TextView dtitle = (TextView) activity.findViewById(31);
+        if (dtitle != null) {
+            dtitle.setText(it.optString("title"));
+            dtitle.setTextColor(ui_c("onSurface"));
+        }
         String line = it.optString("author");
         if ("magazine".equals(type)) line = "期刊 · ISSN " + line;
         if ("issue".equals(type)) line = it.optString("issueLabel");
@@ -265,7 +375,8 @@ public void detail() {
 
 public void action(Object arg) {
     i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
-    String itemJson = (String) i.sss("qj.item");
+    String itemJson = (String) i.sss("qj.detail.item");
+    if (itemJson == null) itemJson = (String) i.sss("qj.item");
     try {
         JSONObject it = new JSONObject(itemJson);
         if ("magazine".equals(it.optString("type"))) {
@@ -283,20 +394,86 @@ public void open() {
     i.uigo("reader.iyu");
 }
 
+// 期次选择：原生 BottomSheetDialog（形变/圆角/手势/遮罩全由 Material 负责，贴底 + 只圆上边两角）
 public void pick() {
-    View scrim = activity.findViewById(20);
-    if (scrim != null) scrim.setVisibility(View.VISIBLE);
+    i.fn("qj_ui"); i.fn("qj_list"); i.fn("qj_core");
+    pages_sheetClose();
+
+    int sh = activity.getResources().getDisplayMetrics().heightPixels;
+    BottomSheetDialog dlg = new BottomSheetDialog(activity);
+
+    LinearLayout root = new LinearLayout(activity);
+    root.setOrientation(LinearLayout.VERTICAL);
+    root.setLayoutParams(new FrameLayout.LayoutParams(-1, (int) (sh * 0.86f)));
+
+    View grip = new View(activity);
+    GradientDrawable gbg = new GradientDrawable();
+    gbg.setColor(ui_c("outline"));
+    gbg.setCornerRadius(ui_dp(2));
+    grip.setBackground(gbg);
+    LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ui_dp(32), ui_dp(4));
+    glp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+    glp.topMargin = ui_dp(10);
+    root.addView(grip, glp);
+
+    TextView title = new TextView(activity);
+    title.setText("选择期次");
+    title.setTextSize(20);
+    title.setTextColor(ui_c("onSurface"));
+    title.setTypeface(Typeface.create("serif", Typeface.BOLD));
+    LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-1, -2);
+    tlp.leftMargin = ui_dp(20);
+    tlp.rightMargin = ui_dp(20);
+    tlp.topMargin = ui_dp(6);
+    tlp.bottomMargin = ui_dp(4);
+    root.addView(title, tlp);
+
+    NestedScrollView sv = new NestedScrollView(activity);
+    sv.setVerticalScrollBarEnabled(false);
+    sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+    LinearLayout list = new LinearLayout(activity);
+    list.setOrientation(LinearLayout.VERTICAL);
+    list.setPadding(0, 0, 0, ui_dp(16));
+    sv.addView(list, new FrameLayout.LayoutParams(-1, -2));
+    root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
+    i.sss("qj.sheet.list", list);
+
+    dlg.setContentView(root);
+    dlg.setCanceledOnTouchOutside(true);
+    dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
+        public void onDismiss(DialogInterface di) {
+            i.sss("qj.sheet", "");
+        }
+    });
+    i.sss("qj.sheet", dlg);
+    dlg.show();
+
+    // 抽屉底色跟主题走；只留上边两角 = Material 原生形状，不自己画
+    try {
+        View panel = (View) root.getParent();
+        Drawable bd = panel == null ? null : panel.getBackground();
+        if (bd instanceof MaterialShapeDrawable) {
+            ((MaterialShapeDrawable) bd).setFillColor(ColorStateList.valueOf(ui_c("surface")));
+        }
+        dlg.getBehavior().setSkipCollapsed(true);
+        dlg.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
+    } catch (Throwable t) {
+        i.syso("SHEET style fail " + t);
+    }
+
+    pages_skeletonView(list, "正在加载期次…");
     new Thread(new Runnable() {
         public void run() {
             try {
-                JSONObject it = new JSONObject((String) i.sss("qj.item"));
+                String parentJson = (String) i.sss("qj.detail.item");
+                if (parentJson == null) parentJson = (String) i.sss("qj.item");
+                JSONObject it = new JSONObject(parentJson);
                 ArrayList issues = core_issues(it.optInt("magazineId"));
                 i.sss("qj.issues", issues);
                 i.syso("PICK issues=" + issues.size());
                 activity.runOnUiThread(new Runnable() {
                     public void run() {
-                        list_clear(24);
-                        list_issueRows(24, (ArrayList) i.sss("qj.issues"));
+                        list_issueRowsView((LinearLayout) i.sss("qj.sheet.list"), (ArrayList) i.sss("qj.issues"));
                     }
                 });
             } catch (Throwable e) {
@@ -307,20 +484,30 @@ public void pick() {
 }
 
 public void closePick(Object arg) {
-    View scrim = activity.findViewById(20);
-    if (scrim != null) scrim.setVisibility(View.GONE);
+    pages_sheetClose();
+}
+
+public void pages_sheetClose() {
+    Object o = i.sss("qj.sheet");
+    if (o instanceof BottomSheetDialog) {
+        try {
+            ((BottomSheetDialog) o).dismiss();
+        } catch (Throwable t) {
+        }
+    }
+    i.sss("qj.sheet", "");
 }
 
 public void backKey(String tag, Object kc) {
     int c = -1;
-    try { c = Integer.parseInt(String.valueOf(kc)); } catch (Throwable t) { }
+    try { c = Integer.parseInt(pages_s(kc)); } catch (Throwable t) { }
     if (c == 4) activity.finish();
 }
 
 public void back(Object kc) {
     int c = -1;
     try {
-        c = Integer.parseInt(String.valueOf(kc));
+        c = Integer.parseInt(pages_s(kc));
     } catch (Throwable t) {
     }
     if (c == 4) activity.finish();
@@ -362,7 +549,7 @@ public void trail(Object arg) {
     LinearLayout head = new LinearLayout(activity);
     head.setOrientation(LinearLayout.HORIZONTAL);
     head.setGravity(android.view.Gravity.CENTER_VERTICAL);
-    head.setPadding(ui_dp(16), ui_dp(16), ui_dp(8), ui_dp(8));
+    head.setPadding(ui_dp(16), 0, ui_dp(8), ui_dp(8));
     TextView title = new TextView(activity);
     title.setText("阅读足迹");
     title.setTextSize(20);
@@ -377,6 +564,7 @@ public void trail(Object arg) {
     clear.setOnClickListener(new View.OnClickListener() {
         public void onClick(View v) { clearTrail(0); }
     });
+    ui_rippleView(clear);
     head.addView(clear, new LinearLayout.LayoutParams(ui_dp(56), ui_dp(44)));
     host.addView(head);
 
@@ -417,4 +605,771 @@ public void clearTrail(Object arg) {
             }
         })
         .show();
+}
+
+
+// ---------- 搜索（本地索引） ----------
+// 后端 books.jspx 的 keyword/name/q 等参数都实测无效：任何关键词都返回全量 2871 条。
+// 因此搜索改为：首次进入后台拉全 11 个图书分类 + 7 个期刊分类，落盘缓存，之后本地过滤标题/作者/简介。
+
+public void search(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
+    // 每次进入搜索页都回到初始态：清掉上一次的关键词与结果，
+    // 否则索引轮询里 ready -> refire 会立刻把旧结果画回来
+    i.sss("qj.kw", "");
+    i.sss("qj.res.books", null);
+    i.sss("qj.res.mags", null);
+    EditText et0 = (EditText) activity.findViewById(5);
+    if (et0 != null) et0.setText("");
+    View root = activity.findViewById(1);
+    if (root != null) root.setBackgroundColor(ui_c("surface"));
+    View bar = activity.findViewById(2);
+    if (bar != null) bar.setBackgroundColor(ui_c("surface"));
+    ImageView back = (ImageView) activity.findViewById(3);
+    if (back != null) {
+        back.setImageBitmap(ui_iconSize("back", 48, (float) 1.8));
+        back.setColorFilter(ui_c("primary"));
+    }
+    TextView btn = (TextView) activity.findViewById(6);
+    if (btn != null) btn.setTextColor(ui_c("primary"));
+    ui_ripple(3); ui_ripple(6);
+    View pill = activity.findViewById(4);
+    if (pill != null) {
+        GradientDrawable ebg = new GradientDrawable();
+        ebg.setColor(ui_c("surfaceContainer"));
+        ebg.setCornerRadius(ui_dp(22));
+        pill.setBackground(ebg);
+    }
+    EditText et = (EditText) activity.findViewById(5);
+    if (et != null) {
+        et.setBackground(null);
+        et.setTextColor(ui_c("onSurface"));
+        et.setHintTextColor(ui_c("onSurfaceVariant"));
+        et.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        et.setPadding(ui_dp(16), 0, ui_dp(44), 0);
+    }
+    ImageView clr = (ImageView) activity.findViewById(12);
+    if (clr != null) {
+        clr.setScaleType(ImageView.ScaleType.CENTER);
+        clr.setImageBitmap(ui_iconSize("close", 24, (float) 1.8));
+        clr.setColorFilter(ui_c("onSurfaceVariant"));
+        clr.setVisibility(View.GONE);
+        ui_rippleView(clr, 20);
+        FrameLayout.LayoutParams clp = (FrameLayout.LayoutParams) clr.getLayoutParams();
+        clp.gravity = android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL;
+        clp.rightMargin = ui_dp(4);
+        clr.setLayoutParams(clp);
+    }
+    pages_renderIdle();
+    pages_indexStart();
+    pages_poll();
+}
+
+public String pages_idxStatusText() {
+    String st = pages_s(i.sss("qj.idx.state"));
+    ArrayList b = (ArrayList) i.sss("qj.idx.books");
+    ArrayList m = (ArrayList) i.sss("qj.idx.mags");
+    int nb = (b == null) ? 0 : b.size();
+    int nm = (m == null) ? 0 : m.size();
+    if ("ready".equals(st)) return "索引就绪 · 图书 " + nb + " · 期刊 " + nm;
+    if ("failed".equals(st)) return "索引建立失败，点此重试";
+    if ("building".equals(st)) {
+        int d = pages_i(i.sss("qj.prog.done"), 0);
+        int t = pages_i(i.sss("qj.prog.total"), 18);
+        return "正在建立索引 · " + d + " / " + t + " · 点此可强制重建";
+    }
+    return "首次搜索会自动建立索引";
+}
+
+// UI 只从 i.sss 读进度：索引线程可能属于上一个页面，不能直接操作当前视图
+public void pages_refreshIndexUi() {
+    TextView st = (TextView) activity.findViewById(900);
+    if (st == null) return;
+    String state = pages_s(i.sss("qj.idx.state"));
+    st.setText(pages_idxStatusText());
+    LinearProgressIndicator bar = (LinearProgressIndicator) activity.findViewById(901);
+    if (bar == null) return;
+    if ("ready".equals(state) || "failed".equals(state)) {
+        bar.setVisibility(View.GONE);
+    } else if ("building".equals(state)) {
+        int d = pages_i(i.sss("qj.prog.done"), 0);
+        int t = pages_i(i.sss("qj.prog.total"), 18);
+        if (t <= 0) t = 18;
+        bar.setMax(t);
+        bar.setProgress(d);
+        bar.setVisibility(View.VISIBLE);
+    }
+}
+
+// 建索引期间每 500ms 刷新一次；页面销毁（900 找不到）自动停
+public void pages_poll() {
+    View anchor = activity.findViewById(900);
+    if (anchor == null) return;
+    String state = pages_s(i.sss("qj.idx.state"));
+    pages_refreshIndexUi();
+    if ("building".equals(state)) {
+        anchor.postDelayed(new Runnable() {
+            public void run() { pages_poll(); }
+        }, 500);
+    } else if ("ready".equals(state)) {
+        pages_refireSearch();
+    }
+}
+
+public void pages_renderIdle() {
+    LinearLayout host = (LinearLayout) activity.findViewById(8);
+    if (host == null) return;
+    host.removeAllViews();
+
+    ArrayList recent = store_recent();
+    if (recent.size() > 0) {
+        list_header(8, "最近搜索");
+        pages_chipRow(8, recent);
+    }
+    list_header(8, "热门搜索");
+    ArrayList hot = new ArrayList();
+    hot.add("读者");
+    hot.add("孔子");
+    hot.add("历史");
+    hot.add("科学");
+    pages_chipRow(8, hot);
+
+    TextView status = new TextView(activity);
+    status.setId(900);
+    status.setText(pages_idxStatusText());
+    status.setTextSize(13);
+    status.setTextColor(ui_c("onSurfaceVariant"));
+    status.setPadding(ui_dp(20), ui_dp(16), ui_dp(20), ui_dp(8));
+    status.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) { pages_rebuild(0); }
+    });
+    host.addView(status);
+
+    LinearProgressIndicator bar = new LinearProgressIndicator(activity);
+    bar.setId(901);
+    bar.setMax(18);
+    bar.setProgress(0);
+    bar.setIndicatorColor(new int[]{ui_c("primary")});
+    bar.setTrackColor(ui_c("divider"));
+    LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, ui_dp(6));
+    blp.leftMargin = ui_dp(20);
+    blp.rightMargin = ui_dp(20);
+    blp.topMargin = ui_dp(4);
+    bar.setVisibility("ready".equals(pages_s(i.sss("qj.idx.state"))) ? View.GONE : View.VISIBLE);
+    host.addView(bar, blp);
+    if ("building".equals(pages_s(i.sss("qj.idx.state")))) pages_poll();
+}
+
+public void pages_chipRow(int containerId, ArrayList words) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    HorizontalScrollView hs = new HorizontalScrollView(activity);
+    hs.setHorizontalScrollBarEnabled(false);
+    LinearLayout row = new LinearLayout(activity);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setPadding(ui_dp(16), 0, ui_dp(8), 0);
+    hs.addView(row);
+    host.addView(hs);
+    for (int k = 0; k < words.size(); k++) {
+        String w = (String) words.get(k);
+        Chip chip = new Chip(activity);
+        chip.setText(w);
+        chip.setTextSize(13);
+        chip.setChipBackgroundColor(ui_cs("#EFEBE2"));
+        chip.setTextColor(ui_c("onSurfaceVariant"));
+        chip.setTag(w);
+        chip.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                EditText et = (EditText) activity.findViewById(5);
+                if (et != null) et.setText((String) v.getTag());
+                doSearch(0);
+            }
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.rightMargin = ui_dp(8);
+        row.addView(chip, lp);
+    }
+}
+
+public HashMap pages_mapOf(JSONObject o) {
+    HashMap m = new HashMap();
+    m.put("key", o.optString("key"));
+    m.put("type", o.optString("type"));
+    m.put("title", o.optString("title"));
+    m.put("author", o.optString("author"));
+    m.put("summary", o.optString("summary"));
+    m.put("cover", o.optString("cover"));
+    m.put("surl", o.optString("surl"));
+    m.put("bookNum", o.optString("bookNum"));
+    m.put("magazineId", o.optString("magazineId"));
+    m.put("newbook", o.optString("newbook"));
+    return m;
+}
+
+public ArrayList pages_cacheList(String key) {
+    String s = store_cacheGet(key);
+    if (s == null) return null;
+    try {
+        JSONArray arr = new JSONArray(s);
+        ArrayList out = new ArrayList();
+        for (int k = 0; k < arr.length(); k++) out.add(pages_mapOf(arr.getJSONObject(k)));
+        i.syso("QJ cache hit " + key + " n=" + out.size());
+        return out;
+    } catch (Throwable t) {
+        i.syso("QJ cache " + key + " fail " + t);
+        return null;
+    }
+}
+
+public String pages_jsonOf(ArrayList list) {
+    try {
+        JSONArray arr = new JSONArray();
+        for (int k = 0; k < list.size(); k++) arr.put(new JSONObject((HashMap) list.get(k)));
+        return arr.toString();
+    } catch (Throwable t) {
+        i.syso("QJ jsonOf fail " + t);
+        return "[]";
+    }
+}
+
+public void pages_indexStart() {
+    String st = pages_s(i.sss("qj.idx.state"));
+    if ("ready".equals(st)) return;
+    if ("building".equals(st)) {
+        long ts = 0;
+        try { ts = Long.parseLong(pages_s(i.sss("qj.idx.ts"))); } catch (Throwable t) { }
+        long now = System.currentTimeMillis() / 1000;
+        if (ts > 0 && now - ts < 60) return;
+        i.syso("QJ idx stale, restart");
+    }
+    i.sss("qj.idx.state", "building");
+    i.sss("qj.idx.ts", "" + (System.currentTimeMillis() / 1000));
+    i.sss("qj.prog.done", "0");
+    i.sss("qj.prog.total", "18");
+    new Thread(new Runnable() {
+        public void run() {
+            try {
+                int total = 18;
+                int done = 0;
+
+                ArrayList books = pages_cacheList("idx_books");
+                if (books == null) {
+                    int[] ids = {124, 125, 126, 127, 128, 129, 130, 131, 132, 140, 141};
+                    books = new ArrayList();
+                    HashMap seen = new HashMap();
+                    for (int k = 0; k < ids.length; k++) {
+                        ArrayList part = core_books(ids[k], 1, -1);
+                        for (int j = 0; j < part.size(); j++) {
+                            HashMap m = (HashMap) part.get(j);
+                            String key = (String) m.get("key");
+                            if (!seen.containsKey(key)) {
+                                seen.put(key, "1");
+                                books.add(m);
+                            }
+                        }
+                        done++;
+                        pages_progress(done, total);
+                    }
+                    store_cache("idx_books", pages_jsonOf(books));
+                } else {
+                    done = 11;
+                    pages_progress(done, total);
+                }
+                i.sss("qj.idx.books", books);
+                i.syso("QJ idx books=" + books.size());
+
+                ArrayList mags = pages_cacheList("idx_mags");
+                if (mags == null) {
+                    int[] mids = {6, 3, 4, 5, 8, 9, 10};
+                    mags = new ArrayList();
+                    HashMap seen2 = new HashMap();
+                    for (int k = 0; k < mids.length; k++) {
+                        ArrayList part = core_magazines(mids[k], 1, -1);
+                        for (int j = 0; j < part.size(); j++) {
+                            HashMap m = (HashMap) part.get(j);
+                            String key = (String) m.get("key");
+                            if (!seen2.containsKey(key)) {
+                                seen2.put(key, "1");
+                                mags.add(m);
+                            }
+                        }
+                        done++;
+                        pages_progress(done, total);
+                    }
+                    store_cache("idx_mags", pages_jsonOf(mags));
+                } else {
+                    done = total;
+                    pages_progress(done, total);
+                }
+                i.sss("qj.idx.mags", mags);
+                i.syso("QJ idx mags=" + mags.size());
+
+                i.sss("qj.idx.state", "ready");
+                pages_progress(total, total);
+                pages_statusUi();
+                activity.runOnUiThread(new Runnable() {
+                    public void run() { pages_refireSearch(); }
+                });
+            } catch (Throwable t) {
+                i.syso("QJ idx fail " + t);
+                i.sss("qj.idx.state", "failed");
+                pages_statusUi();
+            }
+        }
+    }).start();
+}
+
+public void pages_progress(int done, int total) {
+    i.sss("qj.prog.done", "" + done);
+    i.sss("qj.prog.total", "" + total);
+    i.sss("qj.idx.ts", "" + (System.currentTimeMillis() / 1000));
+}
+
+public void pages_refireSearch() {
+    if (activity.findViewById(8) == null) return;
+    String kw = pages_s(i.sss("qj.kw"));
+    if (kw.length() == 0) return;
+    ArrayList books = pages_filter(i.sss("qj.idx.books"), kw);
+    ArrayList mags = pages_filter(i.sss("qj.idx.mags"), kw);
+    i.sss("qj.res.books", books);
+    i.sss("qj.res.mags", mags);
+    i.syso("QJ search refire kw=" + kw + " books=" + books.size() + " mags=" + mags.size());
+    pages_renderResults();
+}
+
+public void pages_rebuild(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_core"); i.fn("qj_store"); i.fn("qj_list");
+    new MaterialAlertDialogBuilder(activity)
+        .setTitle("重建索引？")
+        .setMessage("会重新拉取全部图书与期刊（约 18 个请求），并覆盖当前缓存。")
+        .setNegativeButton("取消", null)
+        .setPositiveButton("重建", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface d, int w) {
+                store_cacheClear("idx_books");
+                store_cacheClear("idx_mags");
+                i.sss("qj.idx.state", "none");
+                i.sss("qj.idx.books", null);
+                i.sss("qj.idx.mags", null);
+                i.sss("qj.prog.done", "0");
+                i.sss("qj.prog.total", "18");
+                pages_renderIdle();
+                pages_indexStart();
+                pages_poll();
+            }
+        })
+        .show();
+}
+
+public void pages_statusUi() {
+    activity.runOnUiThread(new Runnable() {
+        public void run() {
+            TextView st = (TextView) activity.findViewById(900);
+            if (st != null) st.setText(pages_idxStatusText());
+            LinearProgressIndicator bar = (LinearProgressIndicator) activity.findViewById(901);
+            if (bar != null && "ready".equals(pages_s(i.sss("qj.idx.state")))) bar.setVisibility(View.GONE);
+        }
+    });
+}
+
+public ArrayList pages_filter(Object o, String kw) {
+    ArrayList out = new ArrayList();
+    if (o == null) return out;
+    ArrayList list = (ArrayList) o;
+    String k = kw.toLowerCase();
+    for (int i2 = 0; i2 < list.size(); i2++) {
+        HashMap m = (HashMap) list.get(i2);
+        String blob = (pages_s(m.get("title")) + " " + pages_s(m.get("author"))
+            + " " + pages_s(m.get("summary"))).toLowerCase();
+        if (blob.indexOf(k) >= 0) out.add(m);
+    }
+    return out;
+}
+
+public void editKey(Object ek, Object arg) {
+    pages_syncClear();
+    int c = -1;
+    try { c = Integer.parseInt(String.valueOf(ek)); } catch (Throwable t) { }
+    if (c == 66) doSearch(0);
+}
+
+public void pages_syncClear() {
+    EditText et = (EditText) activity.findViewById(5);
+    ImageView clr = (ImageView) activity.findViewById(12);
+    if (clr == null) return;
+    boolean has = et != null && et.getText().length() > 0;
+    clr.setVisibility(has ? View.VISIBLE : View.GONE);
+}
+
+public void clearSearch(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_store"); i.fn("qj_list");
+    EditText et = (EditText) activity.findViewById(5);
+    if (et != null) {
+        et.setText("");
+        et.requestFocus();
+    }
+    i.sss("qj.kw", "");
+    i.sss("qj.res.books", null);
+    i.sss("qj.res.mags", null);
+    pages_syncClear();
+    pages_renderIdle();
+}
+
+public void doSearch(Object arg) {
+    i.fn("qj_ui"); i.fn("qj_store"); i.fn("qj_list");
+    if ("1".equals(pages_s(i.sss("qj.search.busy")))) return;
+    EditText et = (EditText) activity.findViewById(5);
+    String kw = et == null ? "" : et.getText().toString().trim();
+    if (kw.length() == 0) return;
+    i.sss("qj.search.busy", "1");
+    i.sss("qj.kw", kw);
+    pages_syncClear();
+    store_saveRecent(kw);
+    pages_busyUi(true);
+    pages_showLoading();
+    if (!"ready".equals(pages_s(i.sss("qj.idx.state")))) pages_indexStart();
+    new Thread(new Runnable() {
+        public void run() {
+            try {
+                String k = pages_s(i.sss("qj.kw"));
+                ArrayList books = pages_filter(i.sss("qj.idx.books"), k);
+                ArrayList mags = pages_filter(i.sss("qj.idx.mags"), k);
+                i.sss("qj.res.books", books);
+                i.sss("qj.res.mags", mags);
+                i.syso("QJ search kw=" + k + " books=" + books.size() + " mags=" + mags.size());
+            } catch (Throwable t) {
+                i.syso("QJ search fail " + t);
+            }
+            activity.runOnUiThread(new Runnable() {
+                public void run() { pages_renderResults(); }
+            });
+        }
+    }).start();
+}
+
+public void pages_busyUi(boolean busy) {
+    TextView btn = (TextView) activity.findViewById(6);
+    if (btn != null) {
+        btn.setEnabled(!busy);
+        btn.setAlpha(busy ? (float) 0.4 : (float) 1.0);
+    }
+}
+
+public void pages_showLoading() {
+    LinearLayout host = (LinearLayout) activity.findViewById(8);
+    if (host == null) return;
+    host.removeAllViews();
+    LinearLayout row = new LinearLayout(activity);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    row.setPadding(ui_dp(20), ui_dp(20), ui_dp(20), ui_dp(8));
+    CircularProgressIndicator cp = new CircularProgressIndicator(activity);
+    cp.setIndeterminate(true);
+    cp.setIndicatorColor(new int[]{ui_c("primary")});
+    row.addView(cp, new LinearLayout.LayoutParams(ui_dp(20), ui_dp(20)));
+    TextView t = new TextView(activity);
+    t.setText("正在搜索…");
+    t.setTextSize(13);
+    t.setTextColor(ui_c("onSurfaceVariant"));
+    LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
+    tp.leftMargin = ui_dp(12);
+    row.addView(t, tp);
+    host.addView(row);
+}
+
+public void pages_renderResults() {
+    i.sss("qj.search.busy", "0");
+    pages_busyUi(false);
+    LinearLayout host = (LinearLayout) activity.findViewById(8);
+    if (host == null) return;
+    host.removeAllViews();
+    String kw = pages_s(i.sss("qj.kw"));
+    ArrayList books = (ArrayList) i.sss("qj.res.books");
+    ArrayList mags = (ArrayList) i.sss("qj.res.mags");
+    if (books == null) books = new ArrayList();
+    if (mags == null) mags = new ArrayList();
+
+    String st = pages_s(i.sss("qj.idx.state"));
+    if (!"ready".equals(st)) {
+        TextView tip = new TextView(activity);
+        int d = pages_i(i.sss("qj.prog.done"), 0);
+        int t = pages_i(i.sss("qj.prog.total"), 18);
+        tip.setText("索引建立中 " + d + " / " + t + "，先显示已完成部分，完成后自动刷新");
+        tip.setTextSize(13);
+        tip.setTextColor(ui_c("onSurfaceVariant"));
+        tip.setPadding(ui_dp(20), ui_dp(12), ui_dp(20), ui_dp(4));
+        host.addView(tip);
+    }
+
+    if (books.size() == 0 && mags.size() == 0) {
+        TextView empty = new TextView(activity);
+        empty.setText("没有找到「" + kw + "」\n换个关键词，或试试上面的热门搜索");
+        empty.setTextSize(16);
+        empty.setTextColor(ui_c("onSurfaceVariant"));
+        empty.setGravity(android.view.Gravity.CENTER);
+        empty.setPadding(ui_dp(24), ui_dp(32), ui_dp(24), ui_dp(24));
+        host.addView(empty);
+        return;
+    }
+    if (books.size() > 0) {
+        list_header(8, "图书 · " + books.size());
+        list_rows(8, books);
+    }
+    if (mags.size() > 0) {
+        list_header(8, "期刊 · " + mags.size());
+        list_rows(8, mags);
+    }
+}
+
+
+// BeanShell 里 String.valueOf(null) 会选中 char[] 重载并 NPE，统一走这个兜底
+public String pages_s(Object o) {
+    return o == null ? "" : String.valueOf(o);
+}
+
+
+public int pages_i(Object o, int def) {
+    try {
+        return Integer.parseInt(pages_s(o));
+    } catch (Throwable t) {
+        return def;
+    }
+}
+
+
+public void pages_footer(boolean show) {
+    LinearLayout host = (LinearLayout) activity.findViewById(144);
+    if (host == null) return;
+    View old = activity.findViewById(149);
+    if (!show) {
+        if (old != null) host.removeView(old);
+        return;
+    }
+    if (old != null) return;
+    LinearLayout row = new LinearLayout(activity);
+    row.setId(149);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    row.setPadding(ui_dp(20), ui_dp(12), ui_dp(20), ui_dp(12));
+    CircularProgressIndicator cp = new CircularProgressIndicator(activity);
+    cp.setIndeterminate(true);
+    cp.setIndicatorColor(new int[]{ui_c("primary")});
+    row.addView(cp, new LinearLayout.LayoutParams(ui_dp(20), ui_dp(20)));
+    TextView t = new TextView(activity);
+    t.setText("正在加载更多…");
+    t.setTextSize(13);
+    t.setTextColor(ui_c("onSurfaceVariant"));
+    LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
+    tp.leftMargin = ui_dp(12);
+    row.addView(t, tp);
+    host.addView(row);
+}
+
+public void pages_loadingRow(int containerId, String text) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    LinearLayout row = new LinearLayout(activity);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    row.setPadding(ui_dp(20), ui_dp(20), ui_dp(20), ui_dp(12));
+    CircularProgressIndicator cp = new CircularProgressIndicator(activity);
+    cp.setIndeterminate(true);
+    cp.setIndicatorColor(new int[]{ui_c("primary")});
+    row.addView(cp, new LinearLayout.LayoutParams(ui_dp(20), ui_dp(20)));
+    TextView t = new TextView(activity);
+    t.setText(text);
+    t.setTextSize(13);
+    t.setTextColor(ui_c("onSurfaceVariant"));
+    LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
+    tp.leftMargin = ui_dp(12);
+    row.addView(t, tp);
+    host.addView(row);
+}
+
+
+// 下滑显示、上滑隐藏的吸顶头（Tab + 分类）
+public void pages_bindScroll() {
+    if ("1".equals(pages_s(i.sss("qj.sticky.bound")))) return;
+    ScrollView sv = (ScrollView) activity.findViewById(11);
+    if (sv == null) return;
+    i.sss("qj.sticky.bound", "1");
+    sv.setOnScrollChangeListener(new View.OnScrollChangeListener() {
+        public void onScrollChange(View v, int sx, int sy, int oldx, int oldy) {
+            pages_sticky(sy, oldy);
+        }
+    });
+}
+
+public void pages_fab() {
+    if (activity.findViewById(170) != null) return;
+    FrameLayout host = (FrameLayout) activity.findViewById(3);
+    if (host == null) return;
+    FloatingActionButton fab = new FloatingActionButton(activity);
+    fab.setId(170);
+    fab.setBackgroundTintList(ColorStateList.valueOf(ui_c("primaryContainer")));
+    fab.setImageBitmap(ui_iconSize("up", 24, (float) 1.8));
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ui_dp(56), ui_dp(56));
+    lp.gravity = android.view.Gravity.END | android.view.Gravity.BOTTOM;
+    lp.rightMargin = ui_dp(16);
+    lp.bottomMargin = ui_dp(16);
+    host.addView(fab, lp);
+    fab.setVisibility(View.GONE);
+    fab.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) {
+            ScrollView sv = (ScrollView) activity.findViewById(11);
+            if (sv != null) sv.smoothScrollTo(0, 0);
+            i.sss("qj.sticky.show", "1");
+            View head = activity.findViewById(140);
+            if (head != null) head.animate().translationY((float) 0).setDuration(180).start();
+            pages_fabShow(false);
+        }
+    });
+}
+
+public void pages_fabShow(boolean show) {
+    i.sss("qj.fab.shown", show ? "1" : "0");
+    if (!show) i.sss("qj.fab.acc", "0");
+    View fab = activity.findViewById(170);
+    if (fab == null) return;
+    if (show) {
+        fab.setVisibility(View.VISIBLE);
+        fab.setAlpha((float) 0);
+        fab.animate().alpha((float) 1).setDuration(150).start();
+    } else {
+        fab.setVisibility(View.GONE);
+    }
+}
+
+public void pages_sticky(int sy, int oldy) {
+    int dy = sy - oldy;
+
+    // ---- 回顶按钮：离顶够远 + 出现明确的向上滚动意图 ----
+    String fabShown = pages_s(i.sss("qj.fab.shown"));
+    if (dy > 6) {
+        // 继续向下看，说明没打算回顶
+        if ("1".equals(fabShown)) pages_fabShow(false);
+        i.sss("qj.fab.acc", "0");
+    } else if (dy < -6) {
+        int acc = pages_i(i.sss("qj.fab.acc"), 0) + (-dy);
+        i.sss("qj.fab.acc", "" + acc);
+        if (!"1".equals(fabShown) && sy > ui_dp(600) && acc >= ui_dp(120)) {
+            pages_fabShow(true);
+        }
+    }
+    if (sy < ui_dp(300) && "1".equals(pages_s(i.sss("qj.fab.shown")))) {
+        pages_fabShow(false);
+    }
+
+    // ---- 吸顶 Tab：往下翻收起，往上拉滑出 ----
+    View head = activity.findViewById(140);
+    if (head == null || head.getVisibility() != View.VISIBLE) return;
+    int h = pages_i(i.sss("qj.sticky.h"), ui_dp(96));
+    String shown = pages_s(i.sss("qj.sticky.show"));
+    if (sy <= 4) {
+        if (!"1".equals(shown)) {
+            i.sss("qj.sticky.show", "1");
+            head.animate().translationY((float) 0).setDuration(180).start();
+        }
+        return;
+    }
+    if (dy > 8 && "1".equals(shown)) {
+        i.sss("qj.sticky.show", "0");
+        head.animate().translationY((float) -h).setDuration(180).start();
+    } else if (dy < -8 && !"1".equals(shown)) {
+        i.sss("qj.sticky.show", "1");
+        head.animate().translationY((float) 0).setDuration(180).start();
+    }
+}
+
+public void pages_headPad() {
+    View head = activity.findViewById(140);
+    View content = activity.findViewById(14);
+    if (head == null || content == null) return;
+    head.post(new Runnable() {
+        public void run() {
+            View h2 = activity.findViewById(140);
+            View c2 = activity.findViewById(14);
+            if (h2 == null || c2 == null) return;
+            int hh = h2.getHeight();
+            if (hh <= 0) return;
+            i.sss("qj.sticky.h", "" + hh);
+            c2.setPadding(c2.getPaddingLeft(), hh + ui_dp(4), c2.getPaddingRight(), c2.getPaddingBottom());
+        }
+    });
+}
+
+
+public void pages_skeleton(int containerId, String text) {
+    LinearLayout host = (LinearLayout) activity.findViewById(containerId);
+    if (host == null) return;
+    pages_skeletonView(host, text);
+}
+
+public void pages_skeletonView(LinearLayout host, String text) {
+    if (host == null) return;
+    host.removeAllViews();
+
+    LinearLayout box = new LinearLayout(activity);
+    box.setOrientation(LinearLayout.VERTICAL);
+    box.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+    box.setPadding(ui_dp(24), ui_dp(28), ui_dp(24), ui_dp(16));
+
+    int[] ws = {260, 220, 240, 180, 230};
+    for (int k = 0; k < ws.length; k++) {
+        View bar = new View(activity);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ui_c("divider"));
+        bg.setCornerRadius(ui_dp(7));
+        bar.setBackground(bg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ui_dp(ws[k]), ui_dp(14));
+        lp.bottomMargin = ui_dp(14);
+        box.addView(bar, lp);
+    }
+    TextView t = new TextView(activity);
+    t.setText(text);
+    t.setTextSize(13);
+    t.setTextColor(ui_c("onSurfaceVariant"));
+    t.setGravity(android.view.Gravity.CENTER);
+    LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
+    tp.topMargin = ui_dp(8);
+    box.addView(t, tp);
+    host.addView(box);
+
+    // 可变参数方法在 mjava 里必须显式传数组，否则 BeanShell 按固定参数匹配会报 ofFloat not found
+    ObjectAnimator anim = ObjectAnimator.ofFloat(box, "alpha", new float[]{0.45f, 1f});
+    anim.setDuration(700);
+    anim.setRepeatCount(ValueAnimator.INFINITE);
+    anim.setRepeatMode(ValueAnimator.REVERSE);
+    anim.start();
+}
+
+
+public void pages_moreBusy(boolean busy) {
+    MaterialButton more = (MaterialButton) activity.findViewById(145);
+    if (more == null) return;
+    if (busy) {
+        i.sss("qj.more.busy", "1");
+        i.sss("qj.more.n", "0");
+        more.setEnabled(false);
+        more.setAlpha((float) 0.55);
+        pages_moreTick();
+    } else {
+        i.sss("qj.more.busy", "0");
+        more.setEnabled(true);
+        more.setAlpha((float) 1);
+        more.setText("加载更多");
+    }
+}
+
+public void pages_moreTick() {
+    if (!"1".equals(pages_s(i.sss("qj.more.busy")))) return;
+    MaterialButton more = (MaterialButton) activity.findViewById(145);
+    if (more == null) return;
+    int n = pages_i(i.sss("qj.more.n"), 0);
+    String dots = "";
+    for (int k = 0; k < (n % 3) + 1; k++) dots += "·";
+    more.setText("加载中 " + dots);
+    i.sss("qj.more.n", "" + (n + 1));
+    more.postDelayed(new Runnable() {
+        public void run() { pages_moreTick(); }
+    }, 400);
 }

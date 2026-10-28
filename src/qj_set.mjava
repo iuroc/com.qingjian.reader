@@ -1,0 +1,542 @@
+// 青简 · 阅读设置。方法统一 set_ 前缀。
+// 面板是原生 BottomSheetDialog，内容按「分区描述」自动铺：加一项设置 = 在 set_fill 里加一行，
+// 面板骨架、样式、点击/落盘/生效链路都不用改。
+
+import android.content.DialogInterface;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import androidx.core.widget.NestedScrollView;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.shape.MaterialShapeDrawable;
+import com.google.android.material.slider.Slider;
+import java.util.HashMap;
+
+// ---------- 设置读写 ----------
+
+public String set_get(String key) {
+    i.fn("qj_store");
+    Object c = i.sss("qj.set." + key);
+    if (c != null) return String.valueOf(c);
+    HashMap m = store_settings();
+    Object v = m.get(key);
+    String s = v == null ? "" : String.valueOf(v);
+    i.sss("qj.set." + key, s);
+    return s;
+}
+
+public float set_float(String key, float def) {
+    try { return Float.parseFloat(set_get(key)); } catch (Throwable t) { return def; }
+}
+
+// 两位小数，避免浮点尾数跑出来（0.30000001）
+public String set_num(float v) {
+    return "" + (Math.round(v * 100) / 100.0f);
+}
+
+public void set_put(String key, String val) {
+    i.fn("qj_ui"); i.fn("qj_store");
+    i.sss("qj.set." + key, val);
+    store_saveSetting(key, val);
+    if ("always".equals(key)) { set_screen(); return; }
+    set_apply();
+    if ("theme".equals(key)) set_retheme();    // 纸色变了，面板自己也跟着换色
+}
+
+// 换纸色后同步面板外壳（内容由 set_refresh 重建）
+public void set_retheme() {
+    LinearLayout root = (LinearLayout) i.sss("qj.set.root");
+    if (root == null) return;
+    try {
+        View panel = (View) root.getParent();
+        Drawable bd = panel == null ? null : panel.getBackground();
+        // 只有 ColorStateList 重载，没有 setFillColor(int)——写 int 会抛 EvalError，catch 接不住、直接杀进程
+        if (bd instanceof MaterialShapeDrawable) {
+            ((MaterialShapeDrawable) bd).setFillColor(ColorStateList.valueOf(set_c("surface")));
+        }
+        TextView title = (TextView) i.sss("qj.set.title");
+        if (title != null) title.setTextColor(set_c("onSurface"));
+        TextView done = (TextView) i.sss("qj.set.done");
+        if (done != null) done.setTextColor(set_c("primary"));
+        View grip = (View) i.sss("qj.set.grip");
+        if (grip != null && grip.getBackground() instanceof GradientDrawable) {
+            ((GradientDrawable) grip.getBackground()).setColor(set_c("outline"));
+        }
+    } catch (Throwable t) {
+        i.syso("SET retheme fail " + t);
+    }
+}
+
+// 让阅读页按新设置重刷（跨模块用 i.call，读到的是同一份 activity / i.sss）
+public void set_apply() {
+    i.call("mjava", "qj_reader.reader_restyle", new Object[0]);
+}
+
+// ---------- 主题 ----------
+
+public boolean set_dark() {
+    i.fn("qj_ui");
+    String th = set_get("theme");
+    if ("night".equals(th)) return true;
+    if ("paper".equals(th) || "sepia".equals(th)) return false;
+    return ui_dark();
+}
+
+// 阅读页专用的取色：纸色/夜间覆盖系统深浅色，其它 token 回落到全局主题
+public int set_c(String token) {
+    i.fn("qj_ui");
+    String th = set_get("theme");
+    if (th == null || th.length() == 0 || "auto".equals(th)) return ui_c(token);
+    if ("night".equals(th)) {
+        if ("surface".equals(token)) return Color.parseColor("#121511");
+        if ("surfaceContainer".equals(token)) return Color.parseColor("#1E211D");
+        if ("onSurface".equals(token)) return Color.parseColor("#E3E3DA");
+        if ("onSurfaceVariant".equals(token)) return Color.parseColor("#C0C9C1");
+        if ("primary".equals(token)) return Color.parseColor("#A9CDC1");
+        if ("primaryContainer".equals(token)) return Color.parseColor("#2A4A42");
+        if ("onPrimaryContainer".equals(token)) return Color.parseColor("#C3E9DC");
+        if ("outline".equals(token)) return Color.parseColor("#8A938C");
+        if ("divider".equals(token)) return Color.parseColor("#333630");
+        return Color.parseColor("#E3E3DA");
+    }
+    if ("sepia".equals(th)) {
+        if ("surface".equals(token)) return Color.parseColor("#F6ECD9");
+        if ("surfaceContainer".equals(token)) return Color.parseColor("#EFE3CB");
+        if ("onSurface".equals(token)) return Color.parseColor("#3B3020");
+        if ("onSurfaceVariant".equals(token)) return Color.parseColor("#6B5B44");
+        if ("primary".equals(token)) return Color.parseColor("#7A5A2E");
+        if ("primaryContainer".equals(token)) return Color.parseColor("#E3D3B2");
+        if ("onPrimaryContainer".equals(token)) return Color.parseColor("#2A1E08");
+        if ("outline".equals(token)) return Color.parseColor("#A2907A");
+        if ("divider".equals(token)) return Color.parseColor("#E3D5BA");
+        return Color.parseColor("#3B3020");
+    }
+    if ("surface".equals(token)) return Color.parseColor("#FBF8F1");
+    if ("surfaceContainer".equals(token)) return Color.parseColor("#F5F2EA");
+    if ("onSurface".equals(token)) return Color.parseColor("#1B1C18");
+    if ("onSurfaceVariant".equals(token)) return Color.parseColor("#414944");
+    if ("primary".equals(token)) return Color.parseColor("#3F6459");
+    if ("primaryContainer".equals(token)) return Color.parseColor("#C3E9DC");
+    if ("onPrimaryContainer".equals(token)) return Color.parseColor("#00201A");
+    if ("outline".equals(token)) return Color.parseColor("#717973");
+    if ("divider".equals(token)) return Color.parseColor("#E9E5DC");
+    return Color.parseColor("#1B1C18");
+}
+
+public String set_hex(String token) {
+    int c = set_c(token);
+    String h = Integer.toHexString(c & 16777215);
+    while (h.length() < 6) h = "0" + h;
+    return "#" + h;
+}
+
+// 正文样式：字号 / 字间距 / 行距 / 字体 / 纸色 全从这里出，以后加项只加一条 CSS
+public String set_css() {
+    String fam = set_get("fontFamily");
+    String famCss = "serif".equals(fam) ? "'Noto Serif CJK SC',serif" : "sans-serif";
+    return "<style>html,body{margin:0;padding:0;background:" + set_hex("surface") + ";}"
+        + "*{box-sizing:border-box;}"
+        + "body{padding:24px;font-size:" + set_get("font") + "px;"
+        + "letter-spacing:" + set_get("spacing") + "em;"
+        + "line-height:" + set_get("lineHeight") + ";"
+        + "color:" + set_hex("onSurface") + ";font-family:" + famCss + ";}"
+        + "img{max-width:100%!important;height:auto!important;display:block;margin:10px auto;}"
+        + "p{margin:0 0 .9em;}</style>";
+}
+
+// 屏幕常亮：设置面板里切换时立即生效，进阅读页时也会调一次
+public void set_screen() {
+    try {
+        int flag = android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
+        if ("1".equals(set_get("always"))) activity.getWindow().addFlags(flag);
+        else activity.getWindow().clearFlags(flag);
+    } catch (Throwable t) {
+        i.syso("SET screen fail " + t);
+    }
+}
+
+// ---------- 面板 ----------
+
+public void set_open() {
+    i.fn("qj_ui"); i.fn("qj_store");
+    set_close(0);
+    int sh = activity.getResources().getDisplayMetrics().heightPixels;
+    int sw = activity.getResources().getDisplayMetrics().widthPixels;
+    BottomSheetDialog dlg = new BottomSheetDialog(activity);
+    LinearLayout root = new LinearLayout(activity);
+    root.setOrientation(LinearLayout.VERTICAL);
+    root.setLayoutParams(new FrameLayout.LayoutParams(-1, -2));
+
+    View grip = new View(activity);
+    GradientDrawable gbg = new GradientDrawable();
+    gbg.setColor(set_c("outline"));
+    gbg.setCornerRadius(ui_dp(2));
+    grip.setBackground(gbg);
+    LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ui_dp(32), ui_dp(4));
+    glp.gravity = Gravity.CENTER_HORIZONTAL;
+    glp.topMargin = ui_dp(10);
+    root.addView(grip, glp);
+
+    LinearLayout head = new LinearLayout(activity);
+    head.setOrientation(LinearLayout.HORIZONTAL);
+    head.setGravity(Gravity.CENTER_VERTICAL);
+    head.setPadding(ui_dp(20), ui_dp(6), ui_dp(12), ui_dp(2));
+    TextView title = new TextView(activity);
+    title.setText("阅读设置");
+    title.setTextSize(20);
+    title.setTypeface(Typeface.create("serif", Typeface.BOLD));
+    title.setTextColor(set_c("onSurface"));
+    head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView done = new TextView(activity);
+    done.setText("完成");
+    done.setTextSize(14);
+    done.setTextColor(set_c("primary"));
+    done.setGravity(Gravity.CENTER);
+    done.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) { set_close(0); }
+    });
+    ui_rippleView(done, 16);
+    head.addView(done, new LinearLayout.LayoutParams(ui_dp(64), ui_dp(44)));
+    root.addView(head);
+
+    LinearLayout body = new LinearLayout(activity);
+    body.setOrientation(LinearLayout.VERTICAL);
+    set_fill(body);
+    // 内容短就贴内容，内容长就封顶后内部滚动——不盖住上方正文，改完能直接看效果
+    body.measure(View.MeasureSpec.makeMeasureSpec(sw, View.MeasureSpec.EXACTLY),
+                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+    int cap = (int) (sh * 0.58f);
+    if (cap < ui_dp(180)) cap = ui_dp(180);
+    int bh = body.getMeasuredHeight();
+    // NestedScrollView 才能和 BottomSheetBehavior 协同：内容先滚，滚到头才让抽屉接管
+    NestedScrollView sv = new NestedScrollView(activity);
+    sv.setVerticalScrollBarEnabled(false);
+    sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+    sv.setFillViewport(true);
+    sv.addView(body, new FrameLayout.LayoutParams(-1, -2));
+    root.addView(sv, new LinearLayout.LayoutParams(-1, bh < cap ? bh : cap));
+
+    i.sss("qj.set.body", body);
+    i.sss("qj.set.root", root);
+    i.sss("qj.set.title", title);
+    i.sss("qj.set.done", done);
+    i.sss("qj.set.grip", grip);
+    i.sss("qj.set.dlg", dlg);
+    dlg.setContentView(root);
+    // 先顺着祖先链把抽屉本体的底色刷掉：深色主题下不刷就是开抽屉白闪一下
+    View anc = root;
+    for (int k = 0; k < 4; k++) {
+        Object pp = anc.getParent();
+        if (!(pp instanceof View)) break;
+        anc = (View) pp;
+        Drawable ab = anc.getBackground();
+        if (ab instanceof MaterialShapeDrawable) {
+            ((MaterialShapeDrawable) ab).setFillColor(ColorStateList.valueOf(set_c("surface")));
+        }
+    }
+    dlg.setCanceledOnTouchOutside(true);
+    dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
+        public void onDismiss(DialogInterface di) {
+            i.sss("qj.set.dlg", "");
+            i.sss("qj.set.body", null);
+            i.sss("qj.set.root", null);
+            i.sss("qj.set.title", null);
+            i.sss("qj.set.done", null);
+            i.sss("qj.set.grip", null);
+        }
+    });
+    dlg.show();
+    try {
+        dlg.getBehavior().setSkipCollapsed(true);
+        dlg.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
+    } catch (Throwable t) {
+        i.syso("SET style fail " + t);
+    }
+    // 布局前后各刷一次：show() 之后面板壳子可能才换成 MaterialShapeDrawable，160ms 那次是兜底
+    root.postDelayed(new Runnable() {
+        public void run() { set_retheme(); }
+    }, 0L);
+    root.postDelayed(new Runnable() {
+        public void run() { set_retheme(); }
+    }, 160L);
+}
+
+public void set_close(Object arg) {
+    Object d = i.sss("qj.set.dlg");
+    i.sss("qj.set.dlg", "");
+    if (d instanceof BottomSheetDialog) {
+        try { ((BottomSheetDialog) d).dismiss(); } catch (Throwable t) { }
+    }
+}
+
+// 分区表：以后加设置项就在这里加一行
+public void set_fill(LinearLayout body) {
+    if (body == null) return;
+    body.removeAllViews();
+    set_seg(body, "font", "字号", new String[]{"16", "18", "21"}, new String[]{"小", "中", "大"});
+    set_slider(body, "spacing", "字间距", (float) -0.05, (float) 0.3, (float) 0.05, "em");
+    set_slider(body, "lineHeight", "行距", (float) 1.4, (float) 2.2, (float) 0.05, "");
+    set_seg(body, "fontFamily", "字体", new String[]{"sans", "serif"}, new String[]{"黑体", "宋体"});
+    set_swatch(body, "theme", "纸色", new String[]{"auto", "paper", "sepia", "night"},
+               new String[]{"跟随系统", "纸白", "米黄", "夜间"});
+    set_seg(body, "always", "屏幕常亮", new String[]{"0", "1"}, new String[]{"关", "开"});
+
+    // 调乱了能一键回到官方默认
+    View dv = new View(activity);
+    dv.setBackgroundColor(set_c("divider"));
+    LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, ui_dp(1));
+    dlp.leftMargin = ui_dp(20);
+    dlp.rightMargin = ui_dp(20);
+    body.addView(dv, dlp);
+    TextView reset = new TextView(activity);
+    reset.setText("恢复默认设置");
+    reset.setTextSize(14);
+    reset.setTextColor(set_c("primary"));
+    reset.setGravity(Gravity.CENTER);
+    reset.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) { set_resetAsk(); }
+    });
+    ui_rippleView(reset);
+    body.addView(reset, new LinearLayout.LayoutParams(-1, ui_dp(48)));
+
+    TextView hint = new TextView(activity);
+    hint.setText("调节后上方正文会立即变化");
+    hint.setTextSize(12);
+    hint.setTextColor(set_c("onSurfaceVariant"));
+    hint.setGravity(Gravity.CENTER);
+    hint.setPadding(ui_dp(20), ui_dp(4), ui_dp(20), ui_dp(16));
+    body.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+}
+
+public void set_refresh() {
+    LinearLayout body = (LinearLayout) i.sss("qj.set.body");
+    if (body == null) return;
+    set_fill(body);
+}
+
+public void set_resetAsk() {
+    i.fn("qj_ui");
+    new MaterialAlertDialogBuilder(activity)
+        .setTitle("恢复默认设置？")
+        .setMessage("字号、字间距、行距、字体、纸色、屏幕常亮都会回到默认值。")
+        .setNegativeButton("取消", null)
+        .setPositiveButton("恢复默认", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface d, int w) { set_reset(); }
+        })
+        .show();
+}
+
+// 默认值以 store_defaults() 为准，不在面板里另抄一份
+public void set_reset() {
+    i.fn("qj_ui"); i.fn("qj_store");
+    HashMap d = store_defaults();
+    String[] ks = {"font", "spacing", "lineHeight", "fontFamily", "theme", "always"};
+    for (int k = 0; k < ks.length; k++) {
+        Object v = d.get(ks[k]);
+        String s = v == null ? "" : String.valueOf(v);
+        i.sss("qj.set." + ks[k], s);
+        store_saveSetting(ks[k], s);
+    }
+    set_screen();
+    set_apply();
+    set_retheme();
+    set_refresh();
+    i.syso("SET reset done");
+}
+
+// 分区外壳：可选分隔线 + 标签行（左标题 / 右当前值）
+public LinearLayout set_section(LinearLayout body, String key, String label, String value) {
+    if (body.getChildCount() > 0) {
+        View dv = new View(activity);
+        dv.setBackgroundColor(set_c("divider"));
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, ui_dp(1));
+        dlp.leftMargin = ui_dp(20);
+        dlp.rightMargin = ui_dp(20);
+        body.addView(dv, dlp);
+    }
+    LinearLayout sec = new LinearLayout(activity);
+    sec.setOrientation(LinearLayout.VERTICAL);
+    sec.setPadding(ui_dp(20), ui_dp(14), ui_dp(20), ui_dp(14));
+    body.addView(sec, new LinearLayout.LayoutParams(-1, -2));
+
+    LinearLayout lr = new LinearLayout(activity);
+    lr.setOrientation(LinearLayout.HORIZONTAL);
+    lr.setGravity(Gravity.CENTER_VERTICAL);
+    TextView lt = new TextView(activity);
+    lt.setText(label);
+    lt.setTextSize(13);
+    lt.setTextColor(set_c("onSurfaceVariant"));
+    lt.setLetterSpacing((float) 0.06);
+    lr.addView(lt, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView val = new TextView(activity);
+    val.setText(value);
+    val.setTextSize(13);
+    val.setTextColor(set_c("onSurfaceVariant"));
+    lr.addView(val);
+    i.sss("qj.set.v." + key, val);
+    sec.addView(lr, new LinearLayout.LayoutParams(-1, -2));
+    return sec;
+}
+
+// 辅助 id：iApp 会占用 View 的 tag，这里用自增 id 把「哪个键、哪个值」挂到控件上
+public int set_sid() {
+    int n = 0;
+    Object o = i.sss("qj.sidseq");
+    if (o != null) {
+        try { n = Integer.parseInt(String.valueOf(o)); } catch (Throwable t) { }
+    }
+    n = n + 1;
+    i.sss("qj.sidseq", "" + n);
+    return 620000 + n;
+}
+
+public void set_bind(View v, String key, String val) {
+    int sid = set_sid();
+    i.sss("qj.sid." + sid, key + "|" + val);
+    v.setId(sid);
+    v.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v2) { set_click(v2.getId()); }
+    });
+}
+
+public void set_click(int sid) {
+    Object o = i.sss("qj.sid." + sid);
+    if (o == null) return;
+    String d = String.valueOf(o);
+    int p = d.indexOf("|");
+    if (p <= 0) return;
+    set_put(d.substring(0, p), d.substring(p + 1));
+    set_refresh();
+}
+
+// 分段选择：2–4 档，选中段用 primaryContainer 药丸
+public void set_seg(LinearLayout body, String key, String label, String[] vals, String[] names) {
+    String cur = set_get(key);
+    String disp = "";
+    for (int k = 0; k < vals.length; k++) {
+        if (vals[k].equals(cur)) disp = names[k];
+    }
+    LinearLayout sec = set_section(body, key, label, disp);
+    LinearLayout box = new LinearLayout(activity);
+    box.setOrientation(LinearLayout.HORIZONTAL);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(set_c("surfaceContainer"));
+    bg.setCornerRadius(ui_dp(16));
+    box.setBackground(bg);
+    box.setPadding(ui_dp(3), ui_dp(3), ui_dp(3), ui_dp(3));
+    for (int k = 0; k < vals.length; k++) {
+        boolean on = vals[k].equals(cur);
+        TextView seg = new TextView(activity);
+        seg.setText(names[k]);
+        seg.setTextSize(15);
+        seg.setGravity(Gravity.CENTER);
+        if (on) {
+            GradientDrawable sb = new GradientDrawable();
+            sb.setColor(set_c("primaryContainer"));
+            sb.setCornerRadius(ui_dp(13));
+            seg.setBackground(sb);
+            seg.setTextColor(set_c("onPrimaryContainer"));
+            seg.setTypeface(null, Typeface.BOLD);
+            seg.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { }
+            });
+        } else {
+            seg.setTextColor(set_c("onSurfaceVariant"));
+            set_bind(seg, key, vals[k]);
+            ui_rippleView(seg, 13);
+        }
+        box.addView(seg, new LinearLayout.LayoutParams(0, -1, 1));
+    }
+    LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, ui_dp(44));
+    blp.topMargin = ui_dp(10);
+    sec.addView(box, blp);
+}
+
+// 滑块：连续值用，拖动时只更新右侧数值，不重建控件（否则拖到一半会被打断）
+public void set_slider(LinearLayout body, String key, String label, float from, float to, float step, String unit) {
+    float cur = set_float(key, from);
+    if (cur < from) cur = from;
+    if (cur > to) cur = to;
+    String u = unit == null ? "" : unit;
+    LinearLayout sec = set_section(body, key, label, set_num(cur) + (u.length() > 0 ? " " + u : ""));
+    Slider sl = new Slider(activity);
+    sl.setValueFrom(from);
+    sl.setValueTo(to);
+    sl.setStepSize(step);
+    sl.setValue(cur);
+    // 不去 setTrackTintList/setThumbTintList：这两个重载随 Material 版本变，调不到就是 EvalError 直接杀进程，
+    // 先用控件默认色，确认可用后再按需加
+    sl.addOnChangeListener(new Slider.OnChangeListener() {
+        public void onValueChange(Slider s, float v, boolean fromUser) {
+            if (!fromUser) return;
+            set_put(key, set_num(v));
+            TextView vt = (TextView) i.sss("qj.set.v." + key);
+            if (vt != null) vt.setText(set_num(v) + (u.length() > 0 ? " " + u : ""));
+        }
+    });
+    LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, ui_dp(48));
+    slp.topMargin = ui_dp(2);
+    sec.addView(sl, slp);
+}
+
+// 纸色：圆形色板，选中加一圈 primary 描边
+public void set_swatch(LinearLayout body, String key, String label, String[] vals, String[] names) {
+    String cur = set_get(key);
+    String disp = "";
+    for (int k = 0; k < vals.length; k++) {
+        if (vals[k].equals(cur)) disp = names[k];
+    }
+    LinearLayout sec = set_section(body, key, label, disp);
+    LinearLayout row = new LinearLayout(activity);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(Gravity.CENTER_VERTICAL);
+    for (int k = 0; k < vals.length; k++) {
+        boolean on = vals[k].equals(cur);
+        LinearLayout item = new LinearLayout(activity);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+
+        View dot = new View(activity);
+        GradientDrawable db = new GradientDrawable();
+        db.setShape(GradientDrawable.OVAL);
+        db.setColor(set_paper(vals[k]));
+        db.setStroke(ui_dp(on ? 2 : 1), on ? set_c("primary") : set_c("divider"));
+        dot.setBackground(db);
+        item.addView(dot, new LinearLayout.LayoutParams(ui_dp(32), ui_dp(32)));
+
+        TextView nm = new TextView(activity);
+        nm.setText(names[k]);
+        nm.setTextSize(12);
+        nm.setTextColor(on ? set_c("primary") : set_c("onSurfaceVariant"));
+        nm.setGravity(Gravity.CENTER);
+        // 12sp 的中文在这里行高偏紧，给一点上下内边距，别让字底被切
+        nm.setPadding(0, ui_dp(2), 0, ui_dp(3));
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-2, -2);
+        nlp.topMargin = ui_dp(4);
+        item.addView(nm, nlp);
+
+        set_bind(item, key, vals[k]);
+        ui_rippleView(item, 8);
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(0, -2, 1);
+        ilp.topMargin = ui_dp(8);
+        row.addView(item, ilp);
+    }
+    sec.addView(row, new LinearLayout.LayoutParams(-1, -2));
+}
+
+public int set_paper(String theme) {
+    if ("night".equals(theme)) return Color.parseColor("#121511");
+    if ("sepia".equals(theme)) return Color.parseColor("#F6ECD9");
+    if ("paper".equals(theme)) return Color.parseColor("#FBF8F1");
+    i.fn("qj_ui");
+    return ui_c("surface");
+}
